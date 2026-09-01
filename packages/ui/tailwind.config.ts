@@ -1,17 +1,57 @@
 import type { Config } from "tailwindcss";
 
 // Config base compartilhada. Apps consumidores estendem via `presets: [require("@orbix/ui/tailwind.config")]`.
+// Paleta em variáveis CSS (padrão shadcn/ui) — definidas em :root/.dark pelo app consumidor.
 const config: Omit<Config, "content"> = {
+  darkMode: ["class"],
   theme: {
     extend: {
       colors: {
-        // Ancoragem de identidade visual (ver docs/00-nome-e-conceito.md): azul/roxo profundo
-        // como cor primária, verde-pulso e âmbar reservados para indicadores de status de sincronização.
+        // Indicador de status online/sincronizando/offline (docs/06-offline-first.md, 6.6)
+        // — cores fixas, não seguem o tema claro/escuro.
         pulse: {
           online: "#22c55e",
           syncing: "#f59e0b",
           offline: "#ef4444",
         },
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
       },
     },
   },

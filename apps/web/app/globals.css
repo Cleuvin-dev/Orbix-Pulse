@@ -1,3 +1,59 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* Azul/roxo profundo como âncora de identidade (docs/00-nome-e-conceito.md). */
+    --background: 0 0% 100%;
+    --foreground: 234 45% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 234 45% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 234 45% 12%;
+    --primary: 243 65% 38%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 240 20% 96%;
+    --secondary-foreground: 234 45% 12%;
+    --muted: 240 20% 96%;
+    --muted-foreground: 233 10% 45%;
+    --accent: 240 20% 96%;
+    --accent-foreground: 234 45% 12%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 233 20% 90%;
+    --input: 233 20% 90%;
+    --ring: 243 65% 38%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 234 45% 7%;
+    --foreground: 210 40% 98%;
+    --card: 234 40% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 234 40% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 243 70% 65%;
+    --primary-foreground: 234 45% 12%;
+    --secondary: 234 30% 16%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 234 30% 16%;
+    --muted-foreground: 233 15% 65%;
+    --accent: 234 30% 16%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 234 25% 20%;
+    --input: 234 25% 20%;
+    --ring: 243 70% 65%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
