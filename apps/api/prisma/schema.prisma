@@ -1,0 +1,660 @@
+// Modelo de dados do Orbix Pulse — ver docs/03-modelo-dados.md.
+// Convenções (docs/03-modelo-dados.md, 3.1 + CLAUDE.md regra 4/8/9):
+// - toda tabela de negócio tem tenant_id obrigatório (inclusive tabelas filhas,
+//   por exigência explícita do CLAUDE.md, mesmo quando o doc 03 não lista o campo
+//   no resumo de alto nível de uma tabela filha);
+// - toda tabela sincronizável (criada/editada em dispositivo offline) tem
+//   device_id, sync_status e operation_id — aplicado aqui a products, customers,
+//   suppliers, stock_movements, sales, cash_registers e finance_entries, que são
+//   as entidades citadas como editáveis/criáveis offline em docs/07-sync-engine.md
+//   (seção 7.7) e docs/04-regras-negocio.md;
+// - exclusão sempre lógica (deleted_at), nunca física;
+// - valores monetários são inteiros em centavos (Int).
+// stock_movements não tem updated_at/deleted_at: é um livro-razão append-only,
+// nunca editado ou removido (docs/03-modelo-dados.md, 03/04).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  FINANCE
+  CASHIER
+  STOCK
+  SELLER
+  ACCOUNTANT
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum DeviceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// Estado local de sincronização de um registro (docs/03-modelo-dados.md, 3.1).
+enum SyncStatus {
+  PENDING
+  SYNCING
+  SYNCED
+  CONFLICT
+}
+
+enum BarcodeType {
+  EAN13
+  EAN8
+  UPC
+  CODE128
+  QR
+}
+
+enum StockMovementType {
+  ENTRADA
+  SAIDA
+  DEVOLUCAO
+  AJUSTE
+  TRANSFERENCIA
+  VENDA
+  COMPRA
+}
+
+enum SaleStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  PIX
+  OTHER
+}
+
+// Não detalhado em docs/03-modelo-dados.md — inferido para cobrir o ciclo de
+// vida mínimo de um pagamento de venda.
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+enum CashRegisterStatus {
+  OPEN
+  CLOSED
+}
+
+enum FinanceEntryType {
+  PAYABLE
+  RECEIVABLE
+}
+
+enum FinanceEntryStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+// Classificação usada para montar o DRE (docs/04-regras-negocio.md, 4.6).
+enum FinanceCategoryKind {
+  REVENUE
+  COST
+  EXPENSE
+}
+
+enum FiscalDocumentType {
+  NFE
+  NFCE
+  NFSE
+}
+
+enum FiscalDocumentStatus {
+  PENDING
+  PROCESSING
+  AUTHORIZED
+  REJECTED
+  CANCELLED
+}
+
+enum SyncOperationStatus {
+  PENDING
+  PROCESSING
+  APPLIED
+  REJECTED
+  CONFLICT
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy
+// ---------------------------------------------------------------------------
+
+model Tenant {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  document  String
+  // "plan" fica como texto livre, não enum: docs/01-visao-produto.md (1.7)
+  // marca os planos como hipótese comercial ainda não fechada.
+  plan      String
+  status    TenantStatus @default(ACTIVE)
+  settings  Json         @default("{}")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  branches          Branch[]
+  devices           Device[]
+  userRoles         UserRole[]
+  productCategories ProductCategory[]
+  products          Product[]
+  barcodes          Barcode[]
+  stockMovements    StockMovement[]
+  customers         Customer[]
+  suppliers         Supplier[]
+  sales             Sale[]
+  saleItems         SaleItem[]
+  payments          Payment[]
+  cashRegisters     CashRegister[]
+  financeCategories FinanceCategory[]
+  financeEntries    FinanceEntry[]
+  fiscalDocuments   FiscalDocument[]
+  auditLogs         AuditLog[]
+  syncOperations    SyncOperation[]
+
+  @@map("tenants")
+}
+
+model Branch {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  address   String?
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  devices        Device[]
+  stockMovements StockMovement[]
+  sales          Sale[]
+  cashRegisters  CashRegister[]
+
+  @@index([tenantId])
+  @@map("branches")
+}
+
+model Device {
+  id         String       @id @default(uuid()) @db.Uuid
+  tenantId   String       @map("tenant_id") @db.Uuid
+  branchId   String       @map("branch_id") @db.Uuid
+  // dono principal do device
+  userId     String?      @map("user_id") @db.Uuid
+  name       String
+  appVersion String?      @map("app_version")
+  lastSyncAt DateTime?    @map("last_sync_at")
+  status     DeviceStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+  deletedAt  DateTime?    @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  owner  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("devices")
+}
+
+// ---------------------------------------------------------------------------
+// Usuários e papéis (RBAC granular chega na Fase 3 — aqui só role por tenant)
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String     @id @default(uuid()) @db.Uuid
+  email     String     @unique
+  name      String
+  // referência ao Supabase Auth — integração real chega na Fase 2
+  authId    String?    @unique @map("auth_id")
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  deletedAt DateTime?  @map("deleted_at")
+
+  roles   UserRole[]
+  devices Device[]
+
+  @@map("users")
+}
+
+model UserRole {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  role      Role
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@map("user_roles")
+}
+
+// ---------------------------------------------------------------------------
+// Produtos
+// ---------------------------------------------------------------------------
+
+model ProductCategory {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  parentId  String?   @map("parent_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  parent   ProductCategory?  @relation("ProductCategoryParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children ProductCategory[] @relation("ProductCategoryParent")
+  products Product[]
+
+  @@index([tenantId])
+  @@map("product_categories")
+}
+
+model Product {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  sku          String
+  name         String
+  categoryId   String?  @map("category_id") @db.Uuid
+  unit         String
+  costPrice    Int      @map("cost_price")
+  salePrice    Int      @map("sale_price")
+  // cache recalculável — a soma de stock_movements é sempre a verdade (03-modelo-dados.md).
+  currentStock Decimal  @default(0) @map("current_stock") @db.Decimal(14, 3)
+  minimumStock Decimal? @map("minimum_stock") @db.Decimal(14, 3)
+  maximumStock Decimal? @map("maximum_stock") @db.Decimal(14, 3)
+  supplierId   String?  @map("supplier_id") @db.Uuid
+  isActive     Boolean  @default(true) @map("is_active")
+
+  deviceId    String?    @map("device_id") @db.Uuid
+  syncStatus  SyncStatus @default(SYNCED) @map("sync_status")
+  operationId String?    @unique @map("operation_id") @db.Uuid
+
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  category ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  supplier Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  barcodes       Barcode[]
+  stockMovements StockMovement[]
+  saleItems      SaleItem[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+  @@map("products")
+}
+
+model Barcode {
+  id        String      @id @default(uuid()) @db.Uuid
+  tenantId  String      @map("tenant_id") @db.Uuid
+  productId String      @map("product_id") @db.Uuid
+  code      String
+  type      BarcodeType
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  deletedAt DateTime?   @map("deleted_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Único por tenant (não globalmente): docs/03-modelo-dados.md (3.5) deixava em
+  // aberto; por tenant evita colisão indevida entre catálogos de empresas distintas.
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("barcodes")
+}
+
+// ---------------------------------------------------------------------------
+// Estoque — livro-razão, nunca editado (docs/04-regras-negocio.md, 4.1)
+// ---------------------------------------------------------------------------
+
+model StockMovement {
+  id          String            @id @default(uuid()) @db.Uuid
+  tenantId    String            @map("tenant_id") @db.Uuid
+  productId   String            @map("product_id") @db.Uuid
+  branchId    String            @map("branch_id") @db.Uuid
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(14, 3)
+  reason      String?
+  // referência polimórfica (ex: sale_id) — sem FK, resolvida pela aplicação.
+  referenceId String?           @map("reference_id") @db.Uuid
+
+  deviceId    String?    @map("device_id") @db.Uuid
+  syncStatus  SyncStatus @default(SYNCED) @map("sync_status")
+  operationId String     @unique @map("operation_id") @db.Uuid
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  branch  Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, productId, createdAt])
+  @@map("stock_movements")
+}
+
+// ---------------------------------------------------------------------------
+// Parceiros de negócio
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  name     String
+  document String?
+  email    String?
+  phone    String?
+  address  String?
+  isActive Boolean @default(true) @map("is_active")
+
+  deviceId    String?    @map("device_id") @db.Uuid
+  syncStatus  SyncStatus @default(SYNCED) @map("sync_status")
+  operationId String?    @unique @map("operation_id") @db.Uuid
+
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sales  Sale[]
+
+  @@index([tenantId])
+  @@map("customers")
+}
+
+model Supplier {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  name     String
+  document String?
+  email    String?
+  phone    String?
+  address  String?
+  isActive Boolean @default(true) @map("is_active")
+
+  deviceId    String?    @map("device_id") @db.Uuid
+  syncStatus  SyncStatus @default(SYNCED) @map("sync_status")
+  operationId String?    @unique @map("operation_id") @db.Uuid
+
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  products Product[]
+
+  @@index([tenantId])
+  @@map("suppliers")
+}
+
+// ---------------------------------------------------------------------------
+// Vendas
+// ---------------------------------------------------------------------------
+
+model Sale {
+  id             String     @id @default(uuid()) @db.Uuid
+  tenantId       String     @map("tenant_id") @db.Uuid
+  branchId       String     @map("branch_id") @db.Uuid
+  customerId     String?    @map("customer_id") @db.Uuid
+  status         SaleStatus @default(OPEN)
+  totalAmount    Int        @map("total_amount")
+  discountAmount Int        @default(0) @map("discount_amount")
+  cashRegisterId String?    @map("cash_register_id") @db.Uuid
+
+  deviceId    String     @map("device_id") @db.Uuid
+  syncStatus  SyncStatus @default(SYNCED) @map("sync_status")
+  operationId String     @unique @map("operation_id") @db.Uuid
+
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  branch       Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  cashRegister CashRegister? @relation(fields: [cashRegisterId], references: [id], onDelete: Restrict)
+
+  items           SaleItem[]
+  payments        Payment[]
+  fiscalDocuments FiscalDocument[]
+
+  @@index([tenantId, branchId, createdAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  saleId    String   @map("sale_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  quantity  Decimal  @db.Decimal(14, 3)
+  unitPrice Int      @map("unit_price")
+  discount  Int      @default(0)
+  total     Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@map("sale_items")
+}
+
+model Payment {
+  id        String        @id @default(uuid()) @db.Uuid
+  tenantId  String        @map("tenant_id") @db.Uuid
+  saleId    String        @map("sale_id") @db.Uuid
+  method    PaymentMethod
+  amount    Int
+  status    PaymentStatus @default(CONFIRMED)
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// Caixa
+// ---------------------------------------------------------------------------
+
+model CashRegister {
+  id             String             @id @default(uuid()) @db.Uuid
+  tenantId       String             @map("tenant_id") @db.Uuid
+  branchId       String             @map("branch_id") @db.Uuid
+  openedBy       String             @map("opened_by") @db.Uuid
+  openedAt       DateTime           @map("opened_at")
+  openingAmount  Int                @map("opening_amount")
+  closedBy       String?            @map("closed_by") @db.Uuid
+  closedAt       DateTime?          @map("closed_at")
+  closingAmount  Int?               @map("closing_amount")
+  expectedAmount Int?               @map("expected_amount")
+  difference     Int?
+  status         CashRegisterStatus @default(OPEN)
+
+  deviceId    String?    @map("device_id") @db.Uuid
+  syncStatus  SyncStatus @default(SYNCED) @map("sync_status")
+  operationId String     @unique @map("operation_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  sales  Sale[]
+
+  @@index([tenantId, branchId, status])
+  @@map("cash_registers")
+}
+
+// ---------------------------------------------------------------------------
+// Financeiro
+// ---------------------------------------------------------------------------
+
+model FinanceCategory {
+  id        String              @id @default(uuid()) @db.Uuid
+  tenantId  String              @map("tenant_id") @db.Uuid
+  name      String
+  kind      FinanceCategoryKind
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+  deletedAt DateTime?           @map("deleted_at")
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  entries FinanceEntry[]
+
+  @@index([tenantId])
+  @@map("finance_categories")
+}
+
+model FinanceEntry {
+  id          String             @id @default(uuid()) @db.Uuid
+  tenantId    String             @map("tenant_id") @db.Uuid
+  type        FinanceEntryType
+  categoryId  String             @map("category_id") @db.Uuid
+  description String
+  amount      Int
+  dueDate     DateTime           @map("due_date")
+  paidAt      DateTime?          @map("paid_at")
+  status      FinanceEntryStatus @default(PENDING)
+  // referência polimórfica (ex: sale_id, purchase_id) — sem FK.
+  referenceId String?            @map("reference_id") @db.Uuid
+
+  deviceId    String?    @map("device_id") @db.Uuid
+  syncStatus  SyncStatus @default(SYNCED) @map("sync_status")
+  operationId String?    @unique @map("operation_id") @db.Uuid
+
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  category FinanceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, dueDate])
+  @@map("finance_entries")
+}
+
+// ---------------------------------------------------------------------------
+// Fiscal — apenas referência ao que o provedor terceirizado processou
+// (docs/08-fiscal.md). Nunca criado offline: sem device_id/operation_id.
+// ---------------------------------------------------------------------------
+
+model FiscalDocument {
+  id                 String               @id @default(uuid()) @db.Uuid
+  tenantId           String               @map("tenant_id") @db.Uuid
+  saleId             String               @map("sale_id") @db.Uuid
+  provider           String
+  providerDocumentId String?              @map("provider_document_id")
+  type               FiscalDocumentType
+  status             FiscalDocumentStatus @default(PENDING)
+  xmlUrl             String?              @map("xml_url")
+  pdfUrl             String?              @map("pdf_url")
+  errorMessage       String?              @map("error_message")
+  requestedAt        DateTime?            @map("requested_at")
+  authorizedAt       DateTime?            @map("authorized_at")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@map("fiscal_documents")
+}
+
+// ---------------------------------------------------------------------------
+// Auditoria e sincronização
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  deviceId  String?  @map("device_id") @db.Uuid
+  action    String
+  entity    String
+  entityId  String   @map("entity_id") @db.Uuid
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, entity, entityId])
+  @@index([tenantId, createdAt])
+  @@map("audit_log")
+}
+
+model SyncOperation {
+  id           String              @id @default(uuid()) @db.Uuid
+  tenantId     String              @map("tenant_id") @db.Uuid
+  deviceId     String              @map("device_id") @db.Uuid
+  // chave de idempotência — gerada no dispositivo, na criação (docs/07-sync-engine.md).
+  operationId  String              @unique @map("operation_id") @db.Uuid
+  // nome do evento (ex: "SALE_CREATED") — ver docs/09-api.md (9.5)
+  entity       String
+  // categoria/tabela de domínio associada ao evento
+  entityType   String              @map("entity_type")
+  payload      Json
+  status       SyncOperationStatus @default(PENDING)
+  errorMessage String?             @map("error_message")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  processedAt  DateTime?           @map("processed_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status])
+  @@map("sync_operations")
+}
