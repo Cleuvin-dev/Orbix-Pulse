@@ -6,6 +6,12 @@ export {
   type FinanceEntryStatus,
   type FinanceEntryType,
 } from "./finance-entry";
+export {
+  FISCAL_DOCUMENT_STATUSES,
+  FISCAL_DOCUMENT_TYPES,
+  type FiscalDocumentStatus,
+  type FiscalDocumentType,
+} from "./fiscal-document";
 export { PAYMENT_METHODS, type PaymentMethod } from "./payment-method";
 export { ROLES, type Role } from "./role";
 export { STOCK_MOVEMENT_TYPES, type StockMovementType } from "./stock-movement-type";

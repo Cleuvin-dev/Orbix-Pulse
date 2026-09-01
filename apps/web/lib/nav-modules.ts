@@ -5,6 +5,7 @@ import {
   FileStack,
   LayoutDashboard,
   Receipt,
+  Settings,
   ShoppingCart,
   Truck,
   Users,
@@ -84,6 +85,13 @@ export const NAV_MODULES: NavModule[] = [
     label: "Usuários e Permissões",
     href: "/usuarios",
     icon: Users,
+    roles: ["OWNER", "ADMIN"],
+  },
+  {
+    key: "configuracoes",
+    label: "Configurações",
+    href: "/configuracoes",
+    icon: Settings,
     roles: ["OWNER", "ADMIN"],
   },
 ];
