@@ -1,0 +1,23 @@
+{
+  "name": "@orbix/validation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@orbix/config": "workspace:*",
+    "eslint": "^9.12.0",
+    "typescript": "^5.6.3"
+  }
+}

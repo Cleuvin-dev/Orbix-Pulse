@@ -1,0 +1,24 @@
+# Postgres standalone para dev local antes da Fase 1 (schema/migrations) ligar a stack completa
+# do Supabase CLI (`supabase start`), que passa a ser a fonte de verdade local de banco a partir daí.
+name: orbix-pulse
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orbix
+      POSTGRES_PASSWORD: orbix
+      POSTGRES_DB: orbix_pulse_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - orbix_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orbix -d orbix_pulse_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  orbix_postgres_data:

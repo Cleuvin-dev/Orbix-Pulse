@@ -1,0 +1,9 @@
+{
+  "extends": "@orbix/config/typescript/base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"]
+}

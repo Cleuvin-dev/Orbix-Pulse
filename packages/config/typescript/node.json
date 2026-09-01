@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Orbix Pulse Node (NestJS)",
+  "extends": "./base.json",
+  // outDir/rootDir ficam de fora de propósito: caminhos relativos aqui resolveriam
+  // contra esta pasta (packages/config/typescript), não contra o tsconfig que estende.
+  // Cada app define outDir/rootDir no próprio tsconfig.json.
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noEmit": false
+  }
+}
