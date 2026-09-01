@@ -4,6 +4,11 @@ import type { Config } from "tailwindcss";
 // Paleta em variáveis CSS (padrão shadcn/ui) — definidas em :root/.dark pelo app consumidor.
 const config: Omit<Config, "content"> = {
   darkMode: ["class"],
+  // A classe "dark" é aplicada em runtime pelo next-themes (nunca aparece
+  // escrita em JSX estático), então o content-scan do Tailwind nunca a "vê" —
+  // sem safelist, a regra `.dark { ... }` de @layer base é descartada em
+  // silêncio (nenhum erro, nenhum aviso) por parecer não utilizada.
+  safelist: ["dark"],
   theme: {
     extend: {
       colors: {
@@ -47,6 +52,26 @@ const config: Omit<Config, "content"> = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        brand: {
+          from: "hsl(var(--brand-from))",
+          to: "hsl(var(--brand-to))",
+        },
+        // Chrome de marca (sidebar) — sempre escuro, reflete a paleta de
+        // img/Orbix.jpeg independente do tema claro/escuro do conteúdo.
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          "muted-foreground": "hsl(var(--sidebar-muted-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))",
+        },
+      },
+      backgroundImage: {
+        "brand-gradient": "linear-gradient(135deg, hsl(var(--brand-from)), hsl(var(--brand-to)))",
       },
       borderRadius: {
         lg: "var(--radius)",

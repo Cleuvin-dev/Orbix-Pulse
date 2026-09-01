@@ -4,49 +4,64 @@
 
 @layer base {
   :root {
-    /* Azul/roxo profundo como âncora de identidade (docs/00-nome-e-conceito.md). */
+    /* Paleta extraída de img/Orbix.jpeg: roxo-violeta -> azul vibrante em
+       gradiente sobre fundo quase preto, cromado nos textos. */
     --background: 0 0% 100%;
-    --foreground: 234 45% 12%;
+    --foreground: 250 30% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 234 45% 12%;
+    --card-foreground: 250 30% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 234 45% 12%;
-    --primary: 243 65% 38%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 240 20% 96%;
-    --secondary-foreground: 234 45% 12%;
-    --muted: 240 20% 96%;
-    --muted-foreground: 233 10% 45%;
-    --accent: 240 20% 96%;
-    --accent-foreground: 234 45% 12%;
+    --popover-foreground: 250 30% 12%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 250 25% 96%;
+    --secondary-foreground: 250 30% 12%;
+    --muted: 250 25% 96%;
+    --muted-foreground: 250 10% 45%;
+    --accent: 217 91% 95%;
+    --accent-foreground: 250 30% 12%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 233 20% 90%;
-    --input: 233 20% 90%;
-    --ring: 243 65% 38%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 250 20% 90%;
+    --input: 250 20% 90%;
+    --ring: 262 83% 58%;
     --radius: 0.5rem;
+
+    /* Marca — sempre escura, é a "vitrine" do logo Orbix independente do tema
+       claro/escuro do conteúdo (sidebar, indicadores de marca). */
+    --brand-from: 271 91% 55%;
+    --brand-to: 217 91% 60%;
+    --sidebar-background: 253 45% 6%;
+    --sidebar-foreground: 240 25% 92%;
+    --sidebar-muted-foreground: 245 15% 65%;
+    --sidebar-primary: 262 83% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 253 35% 14%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 253 30% 16%;
+    --sidebar-ring: 262 83% 65%;
   }
 
   .dark {
-    --background: 234 45% 7%;
-    --foreground: 210 40% 98%;
-    --card: 234 40% 10%;
-    --card-foreground: 210 40% 98%;
-    --popover: 234 40% 10%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 243 70% 65%;
-    --primary-foreground: 234 45% 12%;
-    --secondary: 234 30% 16%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 234 30% 16%;
-    --muted-foreground: 233 15% 65%;
-    --accent: 234 30% 16%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 70% 45%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 234 25% 20%;
-    --input: 234 25% 20%;
-    --ring: 243 70% 65%;
+    --background: 253 40% 7%;
+    --foreground: 240 25% 96%;
+    --card: 253 35% 10%;
+    --card-foreground: 240 25% 96%;
+    --popover: 253 35% 10%;
+    --popover-foreground: 240 25% 96%;
+    --primary: 262 83% 68%;
+    --primary-foreground: 253 40% 10%;
+    --secondary: 253 30% 16%;
+    --secondary-foreground: 240 25% 96%;
+    --muted: 253 30% 16%;
+    --muted-foreground: 245 15% 65%;
+    --accent: 253 30% 16%;
+    --accent-foreground: 240 25% 96%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 253 25% 20%;
+    --input: 253 25% 20%;
+    --ring: 262 83% 68%;
   }
 
   * {

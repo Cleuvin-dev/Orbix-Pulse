@@ -17,6 +17,7 @@ import { ChevronDown } from "lucide-react";
 import { ROLE_LABELS, useDevSession } from "@/lib/dev-session";
 
 import { SyncStatusIndicator } from "./sync-status-indicator";
+import { ThemeToggle } from "./theme-toggle";
 
 function initials(name: string) {
   return name
@@ -39,6 +40,7 @@ export function Topbar() {
 
       <div className="flex items-center gap-3">
         <SyncStatusIndicator />
+        <ThemeToggle />
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-md border border-dashed border-border px-3 py-1.5 text-xs font-medium hover:bg-accent">

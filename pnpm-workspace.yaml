@@ -2,6 +2,13 @@ packages:
   - "apps/*"
   - "packages/*"
   - "tests/*"
+# next@14 embute sua própria dependência fixa de postcss (8.4.31), diferente da
+# que tailwindcss/autoprefixer resolvem. Duas instâncias de postcss no mesmo
+# pipeline causam falha silenciosa: o Tailwind cria nós de regra (ex: a classe
+# .dark de @layer base) com sua própria instância, e a instância do Next não
+# reconhece esses nós ao processar @layer, descartando a regra sem erro nem aviso.
+overrides:
+  postcss: ^8.4.47
 allowBuilds:
   '@nestjs/core': true
   '@prisma/client': true
