@@ -161,3 +161,34 @@ export const financePeriodQuerySchema = z.object({
   to: z.coerce.date(),
 });
 export type FinancePeriodQuery = z.infer<typeof financePeriodQuerySchema>;
+
+// docs/09-api.md (9.5) — contrato de POST /sync/batch. Cada operação do lote
+// é processada individualmente e transacionalmente (uma rejeitada não trava
+// as outras) — por isso "payload" não é validado com o schema específico
+// aqui, isso acontece por operação dentro do dispatcher (uma operação com
+// payload malformado vira REJECTED, não derruba o lote inteiro com 400).
+export const SYNC_ENTITIES = [
+  "SALE_CREATED",
+  "SALE_CANCELLED",
+  "STOCK_MOVEMENT_CREATED",
+  "STOCK_RECONCILED",
+  "CASH_REGISTER_OPENED",
+  "CASH_REGISTER_CLOSED",
+] as const;
+export type SyncEntity = (typeof SYNC_ENTITIES)[number];
+
+export const syncBatchSchema = z.object({
+  deviceId: z.string().uuid(),
+  operations: z
+    .array(
+      z.object({
+        operationId: z.string().uuid(),
+        entity: z.enum(SYNC_ENTITIES),
+        payload: z.record(z.unknown()),
+        createdAt: z.coerce.date(),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+export type SyncBatchInput = z.infer<typeof syncBatchSchema>;

@@ -434,10 +434,68 @@ Fases 3-7 foram todas backend, com as telas ainda em mock.
 
 **Referências:** `07-sync-engine.md`, `09-api.md` (seção 9.5)
 
-- Endpoint `POST /sync/batch`
-- Idempotência via `operation_id`
-- Estratégia de conflito por entidade (tabela da seção 7.7)
-- Indicador de status de sincronização na UI
+- Endpoint `POST /sync/batch` — feito em 2026-09-02.
+  `apps/api/src/application/sync/sync.service.ts`. Desenho deliberado: o
+  dispatcher **reaproveita** `SalesService`, `StockMovementsService` e
+  `CashRegistersService` (Fases 5 e 6) em vez de duplicar a lógica de
+  negócio — cada operação do lote vira uma chamada pro serviço de domínio
+  correto (`SALE_CREATED` → `SalesService.create`,
+  `STOCK_MOVEMENT_CREATED` → `StockMovementsService.createMovement`, etc.).
+  Processadas **sequencialmente** dentro do lote (docs/07-sync-engine.md,
+  7.4: "respeitando dependências, ex: SALE_CREATED antes de PAYMENT_CREATED
+  daquela venda"), nunca em paralelo. Permissão é checada **por operação**
+  (`CanPerformService`, não `@RequirePermission` estático na rota) — uma
+  operação sem permissão vira `REJECTED` sem derrubar as outras do lote
+  (docs/09-api.md, 9.5), testado contra Postgres real (SELLER sem
+  `stock.movement.create` recebeu `REJECTED` numa operação, o resto do lote
+  seguiria normal).
+- Idempotência via `operation_id` — feito: `sync_operations` é o ledger de
+  idempotência do lote em si (docs/07-sync-engine.md, 7.2/7.6 — "operation_id
+  já existe em sync_operations? SIM → retorna resultado anterior"), **além**
+  da idempotência que cada entidade já tinha na própria tabela desde as
+  Fases 5/6 (`sales.operation_id`, `stock_movements.operation_id`,
+  `cash_registers.operation_id`). Reenviar o mesmo `operation_id` retorna
+  `ALREADY_PROCESSED` sem reprocessar — testado contra Postgres real
+  (reenviar o mesmo lote não duplicou o efeito no estoque).
+- Estratégia de conflito por entidade (tabela 7.7) — **feito só para as
+  entidades "aditiva"/"bloqueio de negócio"**: `stock_movements`, `sales`,
+  `sales.status` (cancelamento), `cash_registers`. Essas são exatamente as
+  que já tinham idempotência real desde as Fases 5/6 e são a "parte
+  operacional" que docs/06-offline-first.md (6.7) exige tolerar horas/dias
+  offline. **LWW de `products.price`/`products.name`/`customers` (7.7) fica
+  de fora desta fase, sinalizado, não escondido**: implementar de verdade
+  exigiria rastrear o `operation_id`/timestamp do último edit por campo — o
+  schema atual não guarda isso em lugar nenhum consultável (nem em
+  `Product`, nem em `sync_operations`, que não tem uma coluna `entity_id`
+  pra localizar "qual foi a última operação que tocou este produto"). Isso é
+  uma decisão estrutural (schema novo ou campo novo) que não tomei sozinho.
+- Indicador de status de sincronização na UI — já religado na Fase 8
+  (`SyncStatusIndicator` + `SyncProvider`, `apps/web/lib/sync`) pro estado
+  real de `navigator.onLine` + fila local do Dexie. `GET /v1/sync/status`
+  (backend, feito nesta fase) expõe as contagens por status
+  (`pending`/`applied`/`rejected`/`conflict`) — a UI ainda não consome esse
+  endpoint especificamente (só reflete o estado local do dispositivo), fica
+  como trabalho futuro se o painel técnico de 7.8 for construído.
+- **Bug real de tooling, achado e corrigido**: `describeError()` usava
+  `error instanceof ZodError` pra formatar a mensagem de payload inválido —
+  funcionava nos testes unitários, mas em runtime contra o Postgres real
+  sempre caía em "erro_inesperado". Causa: risco de dual-instância entre o
+  `zod` de `apps/api` e o de `packages/validation` dependendo de como o pnpm
+  resolve os ranges de versão (mesmo problema em espírito do que já
+  aconteceu na Fase 4, mas dessa vez com `instanceof` cross-package, não
+  resolução de módulo). Corrigido checando `error.name === "ZodError"` e a
+  forma do objeto (`issues` array) como fallback, em vez de confiar só em
+  `instanceof` — mais robusto a esse tipo de problema de identidade de
+  classe entre pacotes.
+- **Fora de escopo desta fase, sinalizado**: nenhuma tela do frontend foi
+  religada para de fato ENVIAR um lote pra `/sync/batch` a partir da fila
+  local (`sync_queue`) do Dexie — a fila continua vazia porque nenhuma ação
+  de UI grava nela ainda (todas as telas de negócio continuam mostrando
+  mock, não escrevendo no Dexie). O endpoint existe, é testado e correto,
+  mas o "Sync Client" do dispositivo (docs/06-offline-first.md, 6.2) que
+  consome essa fila e chama este endpoint não foi construído — isso exigiria
+  religar cada tela de negócio pra escrever no Dexie primeiro, escopo bem
+  maior que esta fase sozinha.
 
 **Esta é a fase mais crítica tecnicamente — não deve ser paralelizada com outras fases de negócio.**
 

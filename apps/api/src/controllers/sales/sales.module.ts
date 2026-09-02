@@ -12,5 +12,6 @@ import { SalesController } from "./sales.controller";
   imports: [AuthModule, PermissionsModule, StockModule],
   controllers: [SalesController, CashRegistersController],
   providers: [SalesService, CashRegistersService],
+  exports: [SalesService, CashRegistersService],
 })
 export class SalesModule {}
