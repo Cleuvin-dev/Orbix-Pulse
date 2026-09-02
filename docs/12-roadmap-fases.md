@@ -184,9 +184,48 @@ que `apps/api` precisa pra buildar — não tentar essa rota).
 
 **Referências:** `04-regras-negocio.md` (seção 4.4)
 
-- `stock_movements` como livro-razão
-- Entrada, saída, ajuste, transferência
-- Estoque mínimo e alertas simples (sem inteligência preditiva ainda)
+- `stock_movements` como livro-razão — feito em 2026-09-02. Diferente da Fase 4
+  (produtos), aqui `operation_id` **é obrigatório** no schema (desde a Fase 1) —
+  então a idempotência de `docs/07-sync-engine.md` (7.2) já vale desde já, não
+  é algo adiado pra Fase 9: `operationId` é gerado pelo cliente e enviado no
+  payload (`POST /v1/stock/movements`, `POST /v1/stock/reconciliation`); se já
+  existe um movimento com esse `operation_id`, a API retorna o resultado
+  anterior em vez de reprocessar — inclusive sob corrida (dois requests com o
+  mesmo `operation_id` batendo ao mesmo tempo: o segundo perde no `P2002` da
+  constraint única e busca o que o primeiro já criou). Testado de verdade
+  contra Postgres: reenviar a mesma operação não duplica o movimento nem
+  aplica o efeito no estoque duas vezes.
+- Entrada, saída, ajuste, transferência — feito:
+  `apps/api/src/application/stock/stock-movements.service.ts`. `current_stock`
+  em `products` nunca é um `UPDATE estoque = X` vindo do cliente (CLAUDE.md
+  regra 3) — o cliente manda a ação (tipo + quantidade), o servidor calcula o
+  sinal (ENTRADA/DEVOLUCAO somam, SAIDA/TRANSFERENCIA subtraem) e aplica via
+  `increment` atômico dentro da mesma transação que grava o movimento.
+  `AJUSTE` não é criável pelo endpoint genérico — só via
+  `POST /v1/stock/reconciliation`, que recebe a contagem física e calcula a
+  diferença no servidor (nunca aceita a diferença já pronta do cliente),
+  conforme `docs/04-regras-negocio.md` (4.4, "Reconciliação de estoque").
+  Saída que deixaria o estoque negativo é bloqueada com `409`, a menos que
+  `tenant.settings.allowNegativeStock` esteja `true` (docs/04-regras-negocio.md,
+  4.2). `VENDA`/`COMPRA` ficam de fora deste endpoint de propósito — são
+  gerados pelos fluxos de Vendas (Fase 6) e Compras (sem entidade de pedido de
+  compra ainda — lacuna já sinalizada na Fase 0), nunca criados manualmente.
+- Estoque mínimo e alertas simples — feito: `GET /v1/stock/alerts` lista
+  produtos com `current_stock <= minimum_stock` (limiar fixo, sem previsão —
+  exatamente o "Nível MVP" do doc).
+- Rotas protegidas por `stock.movement.create`/`stock.adjust`
+  (`docs/05-permissoes-rbac.md`, 5.4) — testado contra Postgres real: SELLER
+  (sem a permissão) recebe 403.
+- **Lacuna sinalizada**: não existe permissão dedicada de "visualizar estoque"
+  na matriz — `GET /stock/movements` e `GET /stock/alerts` reaproveitam
+  `products.view`.
+- **Lacuna sinalizada**: `TRANSFERENCIA` entre filiais só decrementa a filial
+  de origem (tratada como "Saída", literal ao texto de 4.4: "transferência
+  entre filiais" está listada em Saída/STOCK_OUT). O schema não tem um campo
+  de filial de destino — a "chegada" na outra filial não é modelada ainda;
+  registrar isso também exigiria dois movimentos (um SAIDA na origem, um
+  ENTRADA no destino) ou um novo campo, decisão que não tomei sozinho porque
+  é estrutural.
 
 ## Fase 6 — PDV e vendas (ainda online-only nesta fase)
 

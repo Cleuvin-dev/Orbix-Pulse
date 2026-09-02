@@ -41,3 +41,33 @@ export const createProductSchema = z.object({
 export const updateProductSchema = createProductSchema.partial();
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
+
+// docs/04-regras-negocio.md (4.4). VENDA/COMPRA de fora de propósito: são
+// geradas pelos fluxos de Vendas (Fase 6) e Compras (fase futura, ainda sem
+// entidade de pedido de compra), nunca criadas manualmente por este endpoint.
+// AJUSTE também fica de fora — tem endpoint dedicado (reconciliação), que
+// calcula a diferença em vez de receber uma quantidade solta.
+// operationId gerado no cliente, na criação — nunca no envio (CLAUDE.md regra 2,
+// docs/07-sync-engine.md, 7.2).
+export const createStockMovementSchema = z.object({
+  operationId: z.string().uuid(),
+  productId: z.string().uuid(),
+  branchId: z.string().uuid(),
+  type: z.enum(["ENTRADA", "SAIDA", "DEVOLUCAO", "TRANSFERENCIA"]),
+  // magnitude, sempre positiva — o efeito (+/-) é decidido pelo type, no servidor.
+  quantity: z.number().positive(),
+  reason: z.string().trim().min(1).max(500),
+});
+export type CreateStockMovementInput = z.infer<typeof createStockMovementSchema>;
+
+// docs/04-regras-negocio.md (4.4, "Reconciliação de estoque"): compara
+// current_stock com a contagem física informada e gera um AJUSTE com a
+// diferença — o caller nunca envia a diferença já calculada.
+export const reconcileStockSchema = z.object({
+  operationId: z.string().uuid(),
+  productId: z.string().uuid(),
+  branchId: z.string().uuid(),
+  countedQuantity: z.number().nonnegative(),
+  reason: z.string().trim().min(1).max(500),
+});
+export type ReconcileStockInput = z.infer<typeof reconcileStockSchema>;
