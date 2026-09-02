@@ -39,6 +39,7 @@ export interface PaginatedResult<T> {
 export interface ListProductsParams {
   search?: string;
   categoryId?: string;
+  isActive?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -47,6 +48,7 @@ export function listProducts(params: ListProductsParams = {}) {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
   if (params.categoryId) query.set("categoryId", params.categoryId);
+  if (params.isActive !== undefined) query.set("isActive", String(params.isActive));
   query.set("page", String(params.page ?? 1));
   query.set("pageSize", String(params.pageSize ?? 50));
   return apiClient.get<PaginatedResult<Product>>(`/v1/products?${query.toString()}`);

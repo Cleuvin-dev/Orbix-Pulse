@@ -155,11 +155,10 @@ comentário em `default-role-permissions.ts`):
   (fetch autenticado com o token do Supabase) + React Query ligado
   (`@tanstack/react-query` já era dependência desde o início, nunca tinha
   sido usado — `apps/web/components/query-provider.tsx`). Estoque e Vendas
-  continuam mock por enquanto, mas passaram a importar o catálogo fake de
-  `apps/web/lib/demo-products.ts` em vez de `app/produtos/mock-products.ts`
-  (que não existe mais, já que Produtos não usa mock nenhum). Sem UI de
-  código de barras ainda (lookup por barcode do parágrafo acima segue só
-  backend). **Bug real encontrado e corrigido**: o `DELETE` do Nest devolve
+  religaram na sequência, no mesmo dia (ver Fase 5/6 abaixo) — nenhuma tela
+  do shell visual usa dado mock de produto hoje; `apps/web/lib/demo-products.ts`
+  foi removido. Sem UI de código de barras ainda (lookup por barcode do
+  parágrafo acima segue só backend). **Bug real encontrado e corrigido**: o `DELETE` do Nest devolve
   `200` com corpo vazio (não `204`) quando o controller não retorna nada — o
   client fazia `.json()` nesse corpo vazio, estourava exceção, e a mutation
   do React Query nunca chamava `onSuccess` — a linha excluída ficava visível
@@ -246,6 +245,30 @@ que `apps/api` precisa pra buildar — não tentar essa rota).
   registrar isso também exigiria dois movimentos (um SAIDA na origem, um
   ENTRADA no destino) ou um novo campo, decisão que não tomei sozinho porque
   é estrutural.
+- **Frontend religado em 2026-09-02** (`apps/web/app/estoque/page.tsx`):
+  alertas de mínimo (`GET /v1/stock/alerts`) e livro-razão de movimentações
+  (`GET /v1/stock/movements`) contra a API real, mais um formulário que cobre
+  os dois endpoints de escrita — movimentação manual
+  (`POST /v1/stock/movements`, tipos ENTRADA/SAIDA/DEVOLUCAO/TRANSFERENCIA) e
+  reconciliação por contagem física (`POST /v1/stock/reconciliation`).
+  `operationId` gerado no cliente com `crypto.randomUUID()` no momento do
+  submit (CLAUDE.md regra 2). `apps/web/app/estoque/mock-movements.ts` foi
+  removido. **Lacuna de blueprint encontrada e resolvida sem inventar
+  entidade nova**: `createStockMovementSchema`/`reconcileStockSchema` exigem
+  `branchId`, mas não existia nenhuma rota que listasse as filiais do tenant
+  (`docs/09-api.md` nunca documentou uma) — o frontend não tinha como
+  descobrir esse id. Resolvido expondo `GET /v1/branches` (só leitura,
+  reaproveita `products.view`, mesmo padrão de `product-categories`/alertas de
+  estoque — não é uma entidade nova, `Branch` já existe desde a Fase 1, só
+  faltava um jeito de listá-la). Ver `docs/09-api.md` (9.4) e
+  `apps/api/src/controllers/branches/`. Frontend usa a primeira filial ativa
+  automaticamente (tenant de desenvolvimento só tem uma, seedada) — sem
+  seletor de filial na UI ainda, porque a matriz de permissões/RBAC não define
+  nada sobre "usuário atrelado a uma filial específica" (fica para quando
+  multi-filial por usuário for modelado). Ver `docs/09-api.md` (9.4). Testado
+  de ponta a ponta com Playwright: login → alertas/movimentações reais
+  carregam → registrar movimentação ENTRADA → aparece no topo da lista com o
+  motivo informado.
 
 ## Fase 6 — PDV e vendas (ainda online-only nesta fase)
 
@@ -310,6 +333,26 @@ que `apps/api` precisa pra buildar — não tentar essa rota).
   pra Vendas/Caixa desta vez (os 3 já feitos em fases anteriores já provam o
   pipeline de guards funciona; a cobertura aqui ficou nos serviços — 225
   testes no total em `apps/api`).
+- **Frontend religado em 2026-09-02** (`apps/web/app/vendas/page.tsx`):
+  PDV real — se o usuário não tem caixa `OPEN` (`GET /v1/cash-registers/current`),
+  mostra só o formulário de abertura; com caixa aberto, mostra o grid de
+  produtos (`GET /v1/products`) + carrinho + `POST /v1/sales` de verdade, e
+  um botão "Fechar caixa" (`POST /v1/cash-registers/:id/close`). Catálogo
+  mock (`DEMO_PRODUCTS`) removido. **Mesma lacuna de filial da Fase 5**
+  (`GET /v1/branches`, primeira filial ativa usada automaticamente) — e uma
+  nova, do mesmo tipo: `createSaleSchema` também exige `deviceId`, e
+  `docs/06-offline-first.md`/`docs/07-sync-engine.md` nunca definiram um fluxo
+  de pareamento de device (só existe o device seedado manualmente por tenant,
+  Fase 1). Resolvido do mesmo jeito — `GET /v1/devices` (só leitura,
+  `products.view` reaproveitada, `apps/api/src/controllers/branches/devices.controller.ts`)
+  listando devices `ACTIVE` do tenant, e o frontend usa o primeiro
+  automaticamente. Fluxo real de pareamento/registro de device (o usuário
+  escolher/nomear o device deste navegador) fica para quando o offline-first
+  de verdade precisar disso — não inventei esse fluxo agora. Testado de ponta
+  a ponta com Playwright: login → abrir caixa com valor real → adicionar
+  produto ao carrinho → finalizar venda → `POST /v1/sales` retorna sucesso e o
+  carrinho zera (a venda gerada aparece no livro-razão de estoque como `VENDA`,
+  visível na tela de Estoque religada acima).
 
 ## Fase 7 — Financeiro
 

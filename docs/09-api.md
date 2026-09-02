@@ -25,6 +25,14 @@ Resposta padrão para acesso negado: `403`, com log em `audit_log` (tentativa ne
 ```
 POST   /auth/session                 (troca de sessão/refresh)
 
+GET    /branches                      (lista filiais ativas do tenant — pré-requisito de
+                                        branch_id em stock/sales/cash-registers; sem
+                                        permissão dedicada, reaproveita products.view)
+GET    /devices                       (lista devices ACTIVE do tenant — pré-requisito de
+                                        device_id em sales; sem fluxo de pareamento real
+                                        ainda, ver 06-offline-first.md; reaproveita
+                                        products.view)
+
 GET    /products
 POST   /products
 PATCH  /products/:id
