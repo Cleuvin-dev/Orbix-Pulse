@@ -13,7 +13,7 @@ import {
 } from "@orbix/ui";
 import type { StockMovementType } from "@orbix/types";
 
-import { MOCK_PRODUCTS } from "@/app/produtos/mock-products";
+import { DEMO_PRODUCTS } from "@/lib/demo-products";
 
 import { MOCK_MOVEMENTS, MOVEMENT_TYPE_LABELS } from "./mock-movements";
 
@@ -29,8 +29,8 @@ const MOVEMENT_BADGE_VARIANT: Record<StockMovementType, "secondary" | "destructi
 };
 
 export default function EstoquePage() {
-  const lowStock = MOCK_PRODUCTS.filter((product) => product.currentStock <= product.minimumStock);
-  const activeSkus = MOCK_PRODUCTS.filter((product) => product.isActive).length;
+  const lowStock = DEMO_PRODUCTS.filter((product) => product.currentStock <= product.minimumStock);
+  const activeSkus = DEMO_PRODUCTS.filter((product) => product.isActive).length;
   const movementsToday = MOCK_MOVEMENTS.filter((movement) => movement.createdAt.startsWith("hoje")).length;
 
   return (

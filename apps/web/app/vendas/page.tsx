@@ -6,7 +6,7 @@ import { Banknote, CreditCard, Minus, Plus, QrCode, Search, Trash2 } from "lucid
 import { useMemo, useState } from "react";
 
 import { formatCentsToBRL } from "@/lib/format";
-import { MOCK_PRODUCTS } from "@/app/produtos/mock-products";
+import { DEMO_PRODUCTS } from "@/lib/demo-products";
 
 interface CartItem {
   sku: string;
@@ -28,7 +28,7 @@ export default function VendasPage() {
 
   const products = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const active = MOCK_PRODUCTS.filter((product) => product.isActive);
+    const active = DEMO_PRODUCTS.filter((product) => product.isActive);
     if (!term) return active;
     return active.filter(
       (product) =>
@@ -37,7 +37,7 @@ export default function VendasPage() {
   }, [search]);
 
   function addToCart(sku: string) {
-    const product = MOCK_PRODUCTS.find((item) => item.sku === sku);
+    const product = DEMO_PRODUCTS.find((item) => item.sku === sku);
     if (!product) return;
     setCart((current) => {
       const existing = current.find((item) => item.sku === sku);

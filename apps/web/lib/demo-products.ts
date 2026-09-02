@@ -1,6 +1,8 @@
-// MOCK — reflete os campos de `products` em docs/03-modelo-dados.md (3.3).
-// CRUD real e paginação chegam na Fase 4 (docs/12-roadmap-fases.md).
-export interface MockProduct {
+// Dado de demonstração pras telas que ainda não foram religadas na API real
+// (Estoque, Vendas) — Produtos já usa /v1/products de verdade
+// (apps/web/app/produtos/page.tsx). Movido pra cá quando a tela de Produtos
+// deixou de precisar de um catálogo fake próprio.
+export interface DemoProduct {
   sku: string;
   name: string;
   category: string;
@@ -12,7 +14,7 @@ export interface MockProduct {
   isActive: boolean;
 }
 
-export const MOCK_PRODUCTS: MockProduct[] = [
+export const DEMO_PRODUCTS: DemoProduct[] = [
   {
     sku: "REF-2L-001",
     name: "Refrigerante 2L",

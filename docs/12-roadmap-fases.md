@@ -147,6 +147,26 @@ comentário em `default-role-permissions.ts`):
   digitado e chamar essa rota — não tratado aqui, é frontend). Leitura via
   câmera (mobile) também é 100% frontend (`getUserMedia` + lib de decodificação),
   nenhuma diferença no contrato da API.
+- **Frontend religado em 2026-09-02** (`apps/web/app/produtos/page.tsx`):
+  CRUD completo (listar com busca, criar, editar, excluir) contra
+  `/v1/products` e `/v1/product-categories` de verdade — não mostra mais
+  dado mock. Primeira tela do shell visual (Fase 0) a virar real. Criada a
+  infraestrutura reutilizável pras próximas telas: `apps/web/lib/api/client.ts`
+  (fetch autenticado com o token do Supabase) + React Query ligado
+  (`@tanstack/react-query` já era dependência desde o início, nunca tinha
+  sido usado — `apps/web/components/query-provider.tsx`). Estoque e Vendas
+  continuam mock por enquanto, mas passaram a importar o catálogo fake de
+  `apps/web/lib/demo-products.ts` em vez de `app/produtos/mock-products.ts`
+  (que não existe mais, já que Produtos não usa mock nenhum). Sem UI de
+  código de barras ainda (lookup por barcode do parágrafo acima segue só
+  backend). **Bug real encontrado e corrigido**: o `DELETE` do Nest devolve
+  `200` com corpo vazio (não `204`) quando o controller não retorna nada — o
+  client fazia `.json()` nesse corpo vazio, estourava exceção, e a mutation
+  do React Query nunca chamava `onSuccess` — a linha excluída ficava visível
+  na tela mesmo com o delete tendo funcionado no banco. Corrigido lendo o
+  corpo como texto antes de decidir se faz `JSON.parse`. Testado de ponta a
+  ponta com Playwright: criar → aparece na lista → editar → nome atualiza →
+  excluir → some da lista.
 
 **Lacunas sinalizadas** (não resolvidas silenciosamente — `default-role-permissions.ts`
 e os controllers têm o mesmo comentário):

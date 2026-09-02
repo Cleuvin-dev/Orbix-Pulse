@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { QueryProvider } from "@/components/query-provider";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SessionProvider } from "@/lib/session";
@@ -32,11 +33,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <ServiceWorkerRegister />
-          <SessionProvider>
-            <SyncProvider>
-              <AppShell>{children}</AppShell>
-            </SyncProvider>
-          </SessionProvider>
+          <QueryProvider>
+            <SessionProvider>
+              <SyncProvider>
+                <AppShell>{children}</AppShell>
+              </SyncProvider>
+            </SessionProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>
