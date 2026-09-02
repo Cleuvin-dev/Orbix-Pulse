@@ -1,4 +1,4 @@
-import { BARCODE_TYPES } from "@orbix/types";
+import { BARCODE_TYPES, PAYMENT_METHODS } from "@orbix/types";
 import { z } from "zod";
 
 // Tudo num arquivo só de propósito: um import relativo (ex: "./barcode") sem
@@ -71,3 +71,58 @@ export const reconcileStockSchema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
 export type ReconcileStockInput = z.infer<typeof reconcileStockSchema>;
+
+// docs/04-regras-negocio.md (4.2). Venda é criada já completa (itens +
+// pagamentos) numa só chamada — não existe fluxo de carrinho em rascunho
+// nesta fase. O total de payments precisa bater exatamente com o total da
+// venda (validado na camada de aplicação, não aqui). operationId gerado no
+// cliente, na criação (CLAUDE.md regra 2).
+export const createSaleSchema = z.object({
+  operationId: z.string().uuid(),
+  branchId: z.string().uuid(),
+  deviceId: z.string().uuid(),
+  cashRegisterId: z.string().uuid(),
+  customerId: z.string().uuid().nullish(),
+  discountAmount: z.number().int().nonnegative().optional(),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        quantity: z.number().positive(),
+        unitPrice: z.number().int().nonnegative(),
+        discount: z.number().int().nonnegative().optional(),
+      }),
+    )
+    .min(1),
+  payments: z
+    .array(
+      z.object({
+        method: z.enum(PAYMENT_METHODS),
+        amount: z.number().int().positive(),
+      }),
+    )
+    .min(1),
+});
+export type CreateSaleInput = z.infer<typeof createSaleSchema>;
+
+// docs/04-regras-negocio.md (4.3). "reason" é obrigatório (a doc exige
+// "motivo obrigatório" na auditoria do cancelamento).
+export const cancelSaleSchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+});
+export type CancelSaleInput = z.infer<typeof cancelSaleSchema>;
+
+// docs/04-regras-negocio.md (4.5). Abertura de caixa exige valor informado;
+// operationId gerado no cliente (CashRegister.operation_id é obrigatório
+// desde a Fase 1, igual stock_movements).
+export const openCashRegisterSchema = z.object({
+  operationId: z.string().uuid(),
+  branchId: z.string().uuid(),
+  openingAmount: z.number().int().nonnegative(),
+});
+export type OpenCashRegisterInput = z.infer<typeof openCashRegisterSchema>;
+
+export const closeCashRegisterSchema = z.object({
+  closingAmount: z.number().int().nonnegative(),
+});
+export type CloseCashRegisterInput = z.infer<typeof closeCashRegisterSchema>;

@@ -33,7 +33,12 @@ describe("StockMovementsService", () => {
     productUpdate = vi.fn().mockReturnValue("update-op");
     branchFindFirst = vi.fn().mockResolvedValue({ id: BRANCH_ID, tenantId: TENANT_ID });
     tenantFindUniqueOrThrow = vi.fn().mockResolvedValue({ id: TENANT_ID, settings: {} });
-    transaction = vi.fn().mockResolvedValue([{ id: "movement-1" }, {}]);
+    const tx = {
+      tenant: { findUniqueOrThrow: tenantFindUniqueOrThrow },
+      stockMovement: { create: movementCreate },
+      product: { update: productUpdate },
+    };
+    transaction = vi.fn().mockImplementation((callback: (tx: unknown) => unknown) => callback(tx));
 
     const prisma = {
       stockMovement: {
@@ -117,7 +122,7 @@ describe("StockMovementsService", () => {
     await expect(
       service.createMovement(TENANT_ID, USER_ID, { ...baseInput, type: "SAIDA", quantity: 10 }),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(transaction).not.toHaveBeenCalled();
+    expect(movementCreate).not.toHaveBeenCalled();
   });
 
   it("SAIDA que deixaria negativo é permitida quando o tenant habilita allow_negative_stock", async () => {

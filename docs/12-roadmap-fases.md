@@ -231,9 +231,65 @@ que `apps/api` precisa pra buildar — não tentar essa rota).
 
 **Referências:** `04-regras-negocio.md` (seções 4.2, 4.3, 4.5)
 
-- Fluxo completo de venda → estoque → financeiro, síncrono, online
-- Abertura/fechamento de caixa
-- Cancelamento de venda com validação de permissão
+- Fluxo completo de venda → estoque → financeiro, síncrono, online — feito em
+  2026-09-02. `apps/api/src/application/sales/sales.service.ts`:
+  `POST /v1/sales` recebe a venda já completa (itens + pagamentos) numa
+  chamada só — sem fluxo de carrinho em rascunho. Tudo atômico numa única
+  transação: `sales` + `sale_items` + `payments` + um `stock_movements` tipo
+  `VENDA` por item (via `StockMovementsService.applySystemMovement`, reusando
+  a mesma checagem de estoque negativo da Fase 5). `Sale.operation_id` é
+  obrigatório desde a Fase 1 — idempotência real, testada de ponta a ponta
+  (reenviar a mesma venda não duplica nem re-debita o estoque). Soma dos
+  `payments` precisa bater exatamente com o total da venda, senão `400`.
+  "Financeiro: + valor no fluxo de caixa da sessão" (4.2) não gerou nenhuma
+  tabela nova — é só o `payments` da venda associado ao `cash_register_id`,
+  usado depois no fechamento do caixa (não precisa de `finance_entries`,
+  que é outra coisa: contas a pagar/receber, Fase 7).
+- Abertura/fechamento de caixa — feito:
+  `apps/api/src/application/sales/cash-registers.service.ts`.
+  `POST /v1/cash-registers/open` bloqueia um segundo caixa `OPEN` do mesmo
+  usuário (regra de negócio, não só UI — docs/04-regras-negocio.md, 4.5).
+  `POST /v1/cash-registers/:id/close` calcula `expected_amount` (abertura +
+  pagamentos `CASH` de vendas não-canceladas dessa sessão) e `difference`;
+  fechar um caixa já `CLOSED` é idempotente por estado (o schema só tem um
+  `operation_id`, da abertura — fechar não tem um novo, então idempotência
+  aqui é "se já fechado, devolve como está" em vez de checar operation_id).
+  Testado ponta a ponta: abrir → vender → cancelar → fechar, e o valor
+  esperado excluiu corretamente a venda cancelada (diferença = 0).
+  **Lacuna sinalizada**: a doc menciona "sangrias" na fórmula do valor
+  esperado, mas não existe entidade de saque de caixa no schema — não
+  inventei uma tabela nova sozinho; o cálculo atual não subtrai sangria
+  nenhuma (não existe o que subtrair ainda).
+- Cancelamento de venda com validação de permissão — feito:
+  nunca é um `DELETE` — `Sale.status` vira `CANCELLED`, estoque estorna via
+  `stock_movements` tipo `DEVOLUCAO` por item (não edita o movimento `VENDA`
+  original). Bloqueia se já existe `fiscal_document` `AUTHORIZED` pra essa
+  venda (nunca dispara hoje — Fase 10 não existe — mas fica correto pra
+  quando existir). **Implementei a política de tempo do MANAGER que ficou
+  sinalizada como pendente desde a Fase 3** (`CanPerform(user, "sales.cancel",
+  { sale })`, docs/05-permissoes-rbac.md, 5.5): OWNER/ADMIN cancelam sem
+  restrição (RBAC já garante isso); MANAGER só dentro de
+  `tenant.settings.saleCancelWindowHours` — **sem configuração, fica
+  bloqueado por padrão** (não inventei um número de horas default). Essa
+  checagem de janela vive em `SalesService.cancel()`, não em
+  `CanPerformService`/`PermissionGuard` — decisão pragmática pra não reabrir o
+  guard genérico pra aceitar contexto de domínio (o `PermissionGuard` só
+  conhece a string de permissão estática do decorator, não o registro da
+  venda). Motivo do cancelamento é obrigatório e vai pro `audit_log`
+  (`action: "SALE_CANCELLED"`) — isso é parte do próprio fluxo de
+  cancelamento (docs/04-regras-negocio.md, 4.3), não só da Fase 12.
+  Testado ponta a ponta: cancelar reverte o estoque, cancelar de novo é
+  idempotente (não duplica o estorno), CASHIER sem `sales.cancel` recebe 403.
+- **Lacuna sinalizada**: `sales`/`GET /sales` reaproveita a permissão
+  `sales.create` pra leitura (sem `sales.view` dedicado na matriz, mesmo
+  padrão de Produtos/Estoque).
+- **Escopo intencionalmente fora desta fase**: emissão fiscal (Fase 10, `sale`
+  não gera `fiscal_document`), `finance_entries` (Fase 7), e qualquer coisa de
+  sync/offline (`device_id`/`operation_id` são só campos preenchidos, sem fila
+  de sincronização real — Fase 9). Sem testes de integração HTTP dedicados
+  pra Vendas/Caixa desta vez (os 3 já feitos em fases anteriores já provam o
+  pipeline de guards funciona; a cobertura aqui ficou nos serviços — 225
+  testes no total em `apps/api`).
 
 ## Fase 7 — Financeiro
 

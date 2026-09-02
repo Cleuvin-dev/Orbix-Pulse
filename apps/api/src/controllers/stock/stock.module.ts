@@ -9,5 +9,6 @@ import { StockMovementsController } from "./stock-movements.controller";
   imports: [AuthModule, PermissionsModule],
   controllers: [StockMovementsController],
   providers: [StockMovementsService],
+  exports: [StockMovementsService],
 })
 export class StockModule {}

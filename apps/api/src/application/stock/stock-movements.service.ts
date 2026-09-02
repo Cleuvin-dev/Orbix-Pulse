@@ -10,6 +10,8 @@ export interface ListMovementsFilters {
   pageSize: number;
 }
 
+type PrismaClientOrTx = PrismaService | Prisma.TransactionClient;
+
 const MAX_PAGE_SIZE = 100;
 
 // Sinal do efeito no estoque por tipo (docs/04-regras-negocio.md, 4.4): Entrada
@@ -32,8 +34,8 @@ export class StockMovementsService {
     if (existing) return existing; // idempotência (docs/07-sync-engine.md, 7.2)
 
     const [product] = await Promise.all([
-      this.findProductOrThrow(tenantId, input.productId),
-      this.findBranchOrThrow(tenantId, input.branchId),
+      this.findProductOrThrow(this.prisma, tenantId, input.productId),
+      this.findBranchOrThrow(this.prisma, tenantId, input.branchId),
     ]);
 
     const sign = MOVEMENT_SIGN[input.type];
@@ -44,15 +46,21 @@ export class StockMovementsService {
     }
     const delta = new Prisma.Decimal(input.quantity).times(sign);
 
-    return this.applyMovement(tenantId, userId, {
-      productId: input.productId,
-      branchId: input.branchId,
-      type: input.type,
-      delta,
-      reason: input.reason,
-      operationId: input.operationId,
-      currentStock: product.currentStock,
-    });
+    try {
+      return await this.prisma.$transaction((tx) =>
+        this.applyMovement(tx, tenantId, userId, {
+          productId: input.productId,
+          branchId: input.branchId,
+          type: input.type,
+          delta,
+          reason: input.reason,
+          operationId: input.operationId,
+          currentStock: product.currentStock,
+        }),
+      );
+    } catch (error) {
+      return this.recoverFromIdempotencyRace(error, input.operationId);
+    }
   }
 
   async reconcile(tenantId: string, userId: string, input: ReconcileStockInput) {
@@ -60,21 +68,27 @@ export class StockMovementsService {
     if (existing) return existing;
 
     const [product] = await Promise.all([
-      this.findProductOrThrow(tenantId, input.productId),
-      this.findBranchOrThrow(tenantId, input.branchId),
+      this.findProductOrThrow(this.prisma, tenantId, input.productId),
+      this.findBranchOrThrow(this.prisma, tenantId, input.branchId),
     ]);
 
     const delta = new Prisma.Decimal(input.countedQuantity).minus(product.currentStock);
 
-    return this.applyMovement(tenantId, userId, {
-      productId: input.productId,
-      branchId: input.branchId,
-      type: "AJUSTE",
-      delta,
-      reason: input.reason,
-      operationId: input.operationId,
-      currentStock: product.currentStock,
-    });
+    try {
+      return await this.prisma.$transaction((tx) =>
+        this.applyMovement(tx, tenantId, userId, {
+          productId: input.productId,
+          branchId: input.branchId,
+          type: "AJUSTE",
+          delta,
+          reason: input.reason,
+          operationId: input.operationId,
+          currentStock: product.currentStock,
+        }),
+      );
+    } catch (error) {
+      return this.recoverFromIdempotencyRace(error, input.operationId);
+    }
   }
 
   async list(tenantId: string, filters: ListMovementsFilters) {
@@ -110,23 +124,17 @@ export class StockMovementsService {
     return candidates.filter((product) => product.minimumStock && product.currentStock.lte(product.minimumStock));
   }
 
-  private async findProductOrThrow(tenantId: string, productId: string) {
-    const product = await this.prisma.product.findFirst({
-      where: { id: productId, tenantId, deletedAt: null },
-    });
-    if (!product) throw new NotFoundException("Produto não encontrado.");
-    return product;
-  }
-
-  private async findBranchOrThrow(tenantId: string, branchId: string) {
-    const branch = await this.prisma.branch.findFirst({
-      where: { id: branchId, tenantId, deletedAt: null },
-    });
-    if (!branch) throw new NotFoundException("Filial não encontrada.");
-    return branch;
-  }
-
-  private async applyMovement(
+  // Usado por outros serviços de domínio (ex: SalesService) que precisam criar
+  // um stock_movement como efeito colateral dentro da PRÓPRIA transação deles
+  // (ex: venda criada -> baixa de estoque tem que ser tudo-ou-nada com a
+  // venda). Sem checagem de idempotência própria aqui — o chamador já garante
+  // isso no nível dele (ex: Sale.operation_id), e o operationId de cada
+  // movimento gerado por um evento de sistema (VENDA, estorno de cancelamento)
+  // é gerado pelo servidor no momento da criação real (dentro da transação),
+  // não pelo cliente — CLAUDE.md regra 2 fala do evento de origem do cliente
+  // (a venda), não de efeitos colaterais internos derivados dele.
+  async applySystemMovement(
+    tx: Prisma.TransactionClient,
     tenantId: string,
     userId: string,
     params: {
@@ -136,11 +144,55 @@ export class StockMovementsService {
       delta: Prisma.Decimal;
       reason: string;
       operationId: string;
+      referenceId?: string;
+    },
+  ) {
+    const product = await this.findProductOrThrow(tx, tenantId, params.productId);
+    return this.applyMovement(tx, tenantId, userId, { ...params, currentStock: product.currentStock });
+  }
+
+  private async findProductOrThrow(client: PrismaClientOrTx, tenantId: string, productId: string) {
+    const product = await client.product.findFirst({
+      where: { id: productId, tenantId, deletedAt: null },
+    });
+    if (!product) throw new NotFoundException("Produto não encontrado.");
+    return product;
+  }
+
+  private async findBranchOrThrow(client: PrismaClientOrTx, tenantId: string, branchId: string) {
+    const branch = await client.branch.findFirst({
+      where: { id: branchId, tenantId, deletedAt: null },
+    });
+    if (!branch) throw new NotFoundException("Filial não encontrada.");
+    return branch;
+  }
+
+  private async recoverFromIdempotencyRace(error: unknown, operationId: string) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      // Corrida: outra requisição com o mesmo operation_id venceu entre o
+      // check inicial e este insert — idempotência ainda vale.
+      return this.prisma.stockMovement.findUniqueOrThrow({ where: { operationId } });
+    }
+    throw error;
+  }
+
+  private async applyMovement(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    userId: string,
+    params: {
+      productId: string;
+      branchId: string;
+      type: StockMovementType;
+      delta: Prisma.Decimal;
+      reason: string;
+      operationId: string;
+      referenceId?: string;
       currentStock: Prisma.Decimal;
     },
   ) {
     if (params.delta.isNegative()) {
-      const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+      const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: tenantId } });
       const settings = tenant.settings as { allowNegativeStock?: boolean } | null;
       const allowNegativeStock = settings?.allowNegativeStock === true;
 
@@ -153,33 +205,23 @@ export class StockMovementsService {
       }
     }
 
-    try {
-      const [movement] = await this.prisma.$transaction([
-        this.prisma.stockMovement.create({
-          data: {
-            tenantId,
-            productId: params.productId,
-            branchId: params.branchId,
-            type: params.type,
-            quantity: params.delta,
-            reason: params.reason,
-            operationId: params.operationId,
-            createdBy: userId,
-          },
-        }),
-        this.prisma.product.update({
-          where: { id: params.productId },
-          data: { currentStock: { increment: params.delta } },
-        }),
-      ]);
-      return movement;
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        // Corrida: outra requisição com o mesmo operation_id venceu entre o
-        // check inicial e este insert — idempotência ainda vale.
-        return this.prisma.stockMovement.findUniqueOrThrow({ where: { operationId: params.operationId } });
-      }
-      throw error;
-    }
+    const movement = await tx.stockMovement.create({
+      data: {
+        tenantId,
+        productId: params.productId,
+        branchId: params.branchId,
+        type: params.type,
+        quantity: params.delta,
+        reason: params.reason,
+        referenceId: params.referenceId,
+        operationId: params.operationId,
+        createdBy: userId,
+      },
+    });
+    await tx.product.update({
+      where: { id: params.productId },
+      data: { currentStock: { increment: params.delta } },
+    });
+    return movement;
   }
 }
