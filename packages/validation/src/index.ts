@@ -1,4 +1,4 @@
-import { BARCODE_TYPES, PAYMENT_METHODS } from "@orbix/types";
+import { BARCODE_TYPES, FINANCE_CATEGORY_KINDS, FINANCE_ENTRY_TYPES, PAYMENT_METHODS } from "@orbix/types";
 import { z } from "zod";
 
 // Tudo num arquivo só de propósito: um import relativo (ex: "./barcode") sem
@@ -126,3 +126,38 @@ export const closeCashRegisterSchema = z.object({
   closingAmount: z.number().int().nonnegative(),
 });
 export type CloseCashRegisterInput = z.infer<typeof closeCashRegisterSchema>;
+
+// docs/04-regras-negocio.md (4.6). Sem hierarquia (diferente de product
+// categories) — o blueprint não pede isso pra finance_categories.
+export const createFinanceCategorySchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  kind: z.enum(FINANCE_CATEGORY_KINDS),
+});
+export type CreateFinanceCategoryInput = z.infer<typeof createFinanceCategorySchema>;
+
+// docs/04-regras-negocio.md (4.6): "lançamentos independentes de venda".
+// operation_id opcional (schema, Fase 1) — igual Produtos (Fase 4), esta fase
+// é online-only, sem fila de sync ainda (Fase 9).
+export const createFinanceEntrySchema = z.object({
+  type: z.enum(FINANCE_ENTRY_TYPES),
+  categoryId: z.string().uuid(),
+  description: z.string().trim().min(1).max(300),
+  amount: z.number().int().positive(),
+  dueDate: z.coerce.date(),
+  referenceId: z.string().uuid().nullish(),
+});
+export const updateFinanceEntrySchema = createFinanceEntrySchema.partial();
+export type CreateFinanceEntryInput = z.infer<typeof createFinanceEntrySchema>;
+export type UpdateFinanceEntryInput = z.infer<typeof updateFinanceEntrySchema>;
+
+export const markFinanceEntryPaidSchema = z.object({
+  paidAt: z.coerce.date().optional(), // default: agora, decidido no servidor
+});
+export type MarkFinanceEntryPaidInput = z.infer<typeof markFinanceEntryPaidSchema>;
+
+// docs/09-api.md (9.4): GET /finance/cash-flow?from=&to=, GET /finance/dre?from=&to=.
+export const financePeriodQuerySchema = z.object({
+  from: z.coerce.date(),
+  to: z.coerce.date(),
+});
+export type FinancePeriodQuery = z.infer<typeof financePeriodQuerySchema>;

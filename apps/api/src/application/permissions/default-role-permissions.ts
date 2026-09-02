@@ -16,6 +16,15 @@ import type { Role } from "@prisma/client";
 //   sessão de caixa aberta do próprio usuário), não uma negação de acesso à
 //   rota. CASHIER recebe a permissão concedida; o filtro de linhas é
 //   responsabilidade da consulta financeira quando ela existir (Fase 5+).
+//
+// Adicionada na Fase 7 (Financeiro), fora da matriz original de 5.4:
+// "finance.manage" — a matriz só tem permissões de LEITURA de financeiro
+// (finance.view/view_profit/export). Criar/editar lançamento (contas a
+// pagar/receber) precisa de uma permissão de escrita, e reaproveitar
+// finance.view daria a ACCOUNTANT (leitura, geralmente externo — 05, 5.2)
+// acesso de escrita a lançamentos financeiros, o que é um problema real, não
+// só uma lacuna cosmética como as reaproveitadas em Produtos/Estoque. Mesmo
+// conjunto de roles que finance.view_profit (OWNER/ADMIN/MANAGER/FINANCE).
 export const DEFAULT_ROLE_PERMISSIONS: Record<Role, string[]> = {
   OWNER: [
     "sales.create",
@@ -29,6 +38,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, string[]> = {
     "finance.view",
     "finance.view_profit",
     "finance.export",
+    "finance.manage",
     "reports.executive.view",
     "fiscal.issue",
     "fiscal.cancel",
@@ -48,6 +58,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, string[]> = {
     "finance.view",
     "finance.view_profit",
     "finance.export",
+    "finance.manage",
     "reports.executive.view",
     "fiscal.issue",
     "fiscal.cancel",
@@ -66,11 +77,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, string[]> = {
     "finance.view",
     "finance.view_profit",
     "finance.export",
+    "finance.manage",
     "reports.executive.view",
     "fiscal.issue",
     "fiscal.cancel", // política* — ver comentário acima
   ],
-  FINANCE: ["products.view", "finance.view", "finance.view_profit", "finance.export"],
+  FINANCE: ["products.view", "finance.view", "finance.view_profit", "finance.export", "finance.manage"],
   CASHIER: [
     "sales.create",
     "products.view",

@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { AuthModule } from "./controllers/auth/auth.module";
+import { FinanceModule } from "./controllers/finance/finance.module";
 import { HealthController } from "./controllers/health.controller";
 import { PermissionsModule } from "./controllers/permissions/permissions.module";
 import { ProductsModule } from "./controllers/products/products.module";
@@ -18,6 +19,7 @@ import { PrismaModule } from "./infrastructure/database/prisma.module";
     ProductsModule,
     StockModule,
     SalesModule,
+    FinanceModule,
   ],
   controllers: [HealthController],
 })

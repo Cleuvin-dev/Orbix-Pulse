@@ -295,9 +295,67 @@ que `apps/api` precisa pra buildar — não tentar essa rota).
 
 **Referências:** `04-regras-negocio.md` (seção 4.6)
 
-- Contas a pagar/receber
-- Fluxo de caixa filtrável por período
-- DRE básico
+- Contas a pagar/receber — feito em 2026-09-02.
+  `apps/api/src/application/finance/finance-entries.service.ts` +
+  `finance-categories.service.ts`. Lançamento tem status
+  `PENDING → PAID | CANCELLED`; marcar como pago e cancelar são idempotentes
+  por estado (repetir a ação num lançamento já `PAID`/`CANCELLED` devolve
+  como está, não reprocessa). Editar um lançamento `PAID`/`CANCELLED` é
+  bloqueado. `operation_id` é opcional no schema (Fase 1) — igual Produtos
+  (Fase 4), esta fase é online-only, sem fila de sync ainda (Fase 9).
+  **Decisão de RBAC que fugiu do padrão das fases anteriores**: a matriz
+  (`05-permissoes-rbac.md`, 5.4) só tem permissões de LEITURA de financeiro
+  (`finance.view`/`view_profit`/`export`) — nenhuma de escrita. Reaproveitar
+  `finance.view` pros endpoints de criar/editar/pagar/cancelar lançamento
+  daria a ACCOUNTANT (papel só-leitura, geralmente externo — 05, 5.2) acesso
+  de escrita a dados financeiros, o que é diferente das lacunas de
+  Produtos/Estoque (lá o conjunto de roles já batia). Por isso, diferente das
+  fases anteriores, **adicionei uma permissão nova** (`finance.manage`,
+  mesmos roles que `finance.view_profit`: OWNER/ADMIN/MANAGER/FINANCE) em vez
+  de só reaproveitar uma existente — documentado em
+  `default-role-permissions.ts` e re-seedado (62 → 66 `role_permissions`).
+  Testado contra Postgres real: ACCOUNTANT tentando criar lançamento recebe
+  403 exatamente como esperado.
+- Fluxo de caixa filtrável por período — feito:
+  `GET /v1/finance/cash-flow?from=&to=`. Não é uma tabela própria
+  (docs/04-regras-negocio.md, 4.6) — agrega `payments` de vendas não
+  canceladas + `finance_entries` `RECEIVABLE`/`PAYABLE` pagos no período.
+  Permissão `finance.view` (CASHIER "limitado" da Fase 3 mantém acesso aqui —
+  ver lacuna sinalizada abaixo).
+- DRE básico — feito: `GET /v1/finance/dre?from=&to=` calcula a cascata do
+  doc (Receita Bruta → Impostos → Receita Líquida → CMV → Lucro Bruto →
+  Despesas Operacionais → Lucro Operacional). **Resolvi uma contradição real
+  entre dois documentos do próprio blueprint** ao decidir a permissão desta
+  rota: `docs/10-testes.md` (10.3) diz literalmente "Given: usuário com role
+  CASHIER, When: GET /finance/dre, Then: 403", mas `05-permissoes-rbac.md`
+  (5.4) concede `finance.view` (ainda que "limitado") pro CASHIER. Usei
+  `finance.view_profit` (que CASHIER não tem) em vez de `finance.view` pra
+  essa rota especificamente — DRE mostra lucro, então é a permissão
+  semanticamente certa, e resolve a contradição exatamente como o próprio
+  doc de testes exige. Testado contra Postgres real: CASHIER recebe 403 em
+  `/finance/dre` mas 200 em `/finance/cash-flow`; venda cancelada
+  (Fase 6) corretamente não aparece na receita; venda válida aparece com
+  CMV calculado certo a partir do `cost_price` do produto.
+  **Duas simplificações sinalizadas** (comentário em `finance-reports.service.ts`):
+  - "Impostos" sempre 0 — a doc só fala em deduzir "quando aplicável, via
+    dados fiscais" (Fase 10, não existe).
+  - CMV usa o `cost_price` **atual** do produto, não o valor no momento da
+    venda — `sale_items` não guarda um snapshot de custo (só `unit_price`,
+    que é preço de venda). Se o custo mudar depois, o DRE de períodos
+    passados muda junto — é uma aproximação, não o valor histórico exato.
+    Corrigir isso direito exigiria um campo novo em `sale_items`
+    (`cost_price_at_sale` ou similar), decisão estrutural que não tomei
+    sozinho.
+- **Lacuna sinalizada, não resolvida**: o CASHIER "limitado" de
+  `finance.view` (Fase 3: "só a sessão de caixa aberta própria") continua
+  sem filtro de dado real em `/finance/cash-flow` — CASHIER vê o fluxo de
+  caixa agregado do tenant inteiro no período, não só a própria sessão.
+  Implementar esse filtro de verdade exigiria decidir o que "sessão própria"
+  significa pra um endpoint agregado por período (não por `cash_register_id`
+  específico), o que não estava claro o suficiente pra decidir sozinho.
+- **Fora de escopo de propósito**: exportação (`finance.export` existe na
+  matriz, mas nenhuma feature desta fase pediu um endpoint de export/CSV —
+  igual `audit.view`, existe a permissão sem uma feature ainda amarrada).
 
 ## Fase 8 — Offline-first (infraestrutura local)
 

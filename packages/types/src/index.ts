@@ -20,6 +20,10 @@ export type FinanceEntryType = (typeof FINANCE_ENTRY_TYPES)[number];
 export const FINANCE_ENTRY_STATUSES = ["PENDING", "PAID", "OVERDUE", "CANCELLED"] as const;
 export type FinanceEntryStatus = (typeof FINANCE_ENTRY_STATUSES)[number];
 
+// Espelha o enum FinanceCategoryKind de apps/api/prisma/schema.prisma (docs/04-regras-negocio.md, 4.6).
+export const FINANCE_CATEGORY_KINDS = ["REVENUE", "COST", "EXPENSE"] as const;
+export type FinanceCategoryKind = (typeof FINANCE_CATEGORY_KINDS)[number];
+
 // Espelha os enums de apps/api/prisma/schema.prisma (docs/03-modelo-dados.md, 3.3 — fiscal_documents / docs/08-fiscal.md).
 export const FISCAL_DOCUMENT_TYPES = ["NFE", "NFCE", "NFSE"] as const;
 export type FiscalDocumentType = (typeof FISCAL_DOCUMENT_TYPES)[number];
