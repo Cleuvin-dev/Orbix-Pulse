@@ -29,9 +29,47 @@ Cada fase deve ser entregue ao Claude Code **isoladamente**, referenciando os do
 
 **Referências:** `02-arquitetura.md` (seção 2.6), `05-permissoes-rbac.md`
 
-- Integração com Supabase Auth
-- Middleware de resolução de `tenant_id` a partir do usuário autenticado
-- RLS básico no Supabase como segunda camada de defesa
+- Integração com Supabase Auth — feito em 2026-09-01: `apps/api` valida o JWT via
+  `supabase.auth.getUser()` (não verifica assinatura localmente) e expõe `GET /v1/auth/me`.
+- Middleware de resolução de `tenant_id` a partir do usuário autenticado — feito:
+  `ResolveCurrentUserService` (`apps/api/src/application/auth`) nunca confia em
+  `tenant_id` vindo do cliente; resolve via `user_roles` no banco, com suporte a
+  usuário multi-tenant via header `X-Tenant-Id` (rejeitado se o vínculo não existir).
+- RLS básico no Supabase como segunda camada de defesa — **ainda não aplicável**:
+  o banco de dados de negócio continua no Postgres local via Docker
+  (`infrastructure/docker/docker-compose.yml`), não no Postgres do Supabase. O
+  Supabase desta fase é usado só para Auth. RLS nas tabelas de negócio só faz
+  sentido quando/se o banco migrar para o Supabase — reavaliar nessa migração.
+- Login real na UI (`apps/web`) — feito em 2026-09-01, além do escopo original
+  dos 3 itens acima (mas natural para a fase estar realmente utilizável):
+  - `apps/web/lib/supabase/client.ts` — cliente Supabase de browser (só a chave
+    pública `NEXT_PUBLIC_SUPABASE_ANON_KEY`, nunca a secret key).
+  - `apps/web/lib/session/session-provider.tsx` — substitui a sessão mock
+    (`DevSessionProvider`, removida). Login (`signIn`), logout (`signOut`) e
+    identidade resolvida sempre via `GET /v1/auth/me` do backend — nunca lê
+    role/tenant do JWT decodificado no cliente.
+  - `apps/web/app/login/page.tsx` — formulário de e-mail/senha.
+  - `apps/web/components/layout/app-shell.tsx` — gate client-side: redireciona
+    pra `/login` quando não autenticado, esconde sidebar/topbar na tela de login.
+  - `apps/api/src/main.ts` — `app.enableCors()` adicionado (fixo pra
+    `http://localhost:3000` em dev, configurável via `WEB_ORIGIN`); sem isso o
+    login quebrava silenciosamente no browser (curl não pega esse tipo de erro,
+    só apareceria no console do navegador).
+  - Tipo `CurrentUser` movido para `packages/types` (compartilhado entre
+    `apps/api` e `apps/web`, evita a resposta de `/v1/auth/me` divergir do que o
+    front espera).
+  - O antigo seletor "Ver como: {role}" no topbar (mock) foi **removido**,
+    substituído por um menu de usuário real (nome/e-mail/badge de role + Sair).
+    A tela de Usuários e Permissões (`apps/web/app/usuarios/page.tsx`) continua
+    com dados de demonstração estáticos (`apps/web/lib/demo-users.ts`) — listar
+    os usuários reais do tenant via API é trabalho futuro, fora do escopo aqui.
+  - **Verificado de ponta a ponta em navegador real (2026-09-02)**: usando o
+    Playwright já presente em `tests/e2e` (spec temporário, rodado e descartado,
+    nunca commitado) — redirect pra `/login` quando deslogado, mensagem de erro
+    em credenciais erradas, login certo leva ao dashboard com dado real (tenant,
+    nome, e-mail, role), dropdown do usuário com logout, sessão sobrevive a F5.
+    Login de teste: `owner@orbixpulse.dev` / `OrbixDev123!` (ou qualquer um dos
+    8 e-mails de `apps/api/prisma/seed.ts`, mesma senha). Fase 2 sem pendências.
 
 ## Fase 3 — RBAC e permissões
 

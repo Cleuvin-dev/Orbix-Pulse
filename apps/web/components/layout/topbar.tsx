@@ -11,10 +11,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@orbix/ui";
-import { ROLES } from "@orbix/types";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, LogOut } from "lucide-react";
 
-import { ROLE_LABELS, useDevSession } from "@/lib/dev-session";
+import { ROLE_LABELS } from "@/lib/role-labels";
+import { useSession } from "@/lib/session";
 
 import { SyncStatusIndicator } from "./sync-status-indicator";
 import { ThemeToggle } from "./theme-toggle";
@@ -29,13 +29,13 @@ function initials(name: string) {
 }
 
 export function Topbar() {
-  const { user, setRole } = useDevSession();
+  const { user, signOut } = useSession();
+  if (!user) return null;
 
   return (
     <header className="flex h-14 items-center justify-between gap-4 border-b border-border bg-background px-4">
       <div>
         <p className="text-sm font-medium">{user.tenantName}</p>
-        <p className="text-xs text-muted-foreground">{user.branchName}</p>
       </div>
 
       <div className="flex items-center gap-3">
@@ -43,27 +43,27 @@ export function Topbar() {
         <ThemeToggle />
 
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-md border border-dashed border-border px-3 py-1.5 text-xs font-medium hover:bg-accent">
-            <Badge variant="outline">mock</Badge>
-            Ver como: {ROLE_LABELS[user.role]}
+          <DropdownMenuTrigger className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5 hover:bg-accent">
+            <Avatar>
+              <AvatarFallback>{initials(user.name)}</AvatarFallback>
+            </Avatar>
             <ChevronDown className="h-3 w-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Pré-visualizar papel (dev)</DropdownMenuLabel>
+            <DropdownMenuLabel className="flex flex-col gap-1">
+              <span className="text-sm font-medium">{user.name}</span>
+              <span className="text-xs font-normal text-muted-foreground">{user.email}</span>
+              <Badge variant="outline" className="w-fit">
+                {ROLE_LABELS[user.role]}
+              </Badge>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {ROLES.map((role) => (
-              <DropdownMenuItem key={role} onClick={() => setRole(role)}>
-                {ROLE_LABELS[role]}
-              </DropdownMenuItem>
-            ))}
+            <DropdownMenuItem onClick={() => void signOut()}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-
-        <div className="flex items-center gap-2">
-          <Avatar>
-            <AvatarFallback>{initials(user.name)}</AvatarFallback>
-          </Avatar>
-        </div>
       </div>
     </header>
   );

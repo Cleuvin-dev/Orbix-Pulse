@@ -2,7 +2,8 @@ import { Badge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } 
 import { ROLES, type Role } from "@orbix/types";
 import { Check, Minus } from "lucide-react";
 
-import { MOCK_USERS, ROLE_LABELS } from "@/lib/dev-session";
+import { DEMO_USERS } from "@/lib/demo-users";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
 // Subconjunto da matriz de permissões de docs/05-permissoes-rbac.md (5.4) — a
 // tabela completa fica em role_permissions no backend (Fase 3 do roadmap).
@@ -39,7 +40,7 @@ export default function UsuariosPage() {
           </TableHeader>
           <TableBody>
             {ROLES.map((role) => {
-              const user = MOCK_USERS[role];
+              const user = DEMO_USERS[role];
               return (
                 <TableRow key={role}>
                   <TableCell className="font-medium">{user.name}</TableCell>

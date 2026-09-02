@@ -1,5 +1,6 @@
 // Entidades e tipos de domínio compartilhados são adicionados conforme as fases de negócio
 // (ver docs/12-roadmap-fases.md).
+export { type CurrentUser } from "./current-user";
 export {
   FINANCE_ENTRY_STATUSES,
   FINANCE_ENTRY_TYPES,

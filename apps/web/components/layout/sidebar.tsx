@@ -5,13 +5,13 @@ import { Orbit } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { useDevSession } from "@/lib/dev-session";
 import { navModulesForRole } from "@/lib/nav-modules";
+import { useSession } from "@/lib/session";
 
 export function Sidebar() {
-  const { user } = useDevSession();
+  const { user } = useSession();
   const pathname = usePathname();
-  const modules = navModulesForRole(user.role);
+  const modules = user ? navModulesForRole(user.role) : [];
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">

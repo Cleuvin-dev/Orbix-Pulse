@@ -2,7 +2,7 @@
 
 import type { Role } from "@orbix/types";
 
-import { useDevSession } from "@/lib/dev-session";
+import { useSession } from "@/lib/session";
 
 import { ExecutiveDashboard } from "./executive-dashboard";
 import { FinanceHome } from "./finance-home";
@@ -23,7 +23,8 @@ const HOME_BY_ROLE: Record<Role, () => React.JSX.Element> = {
 };
 
 export function RoleHome() {
-  const { user } = useDevSession();
+  const { user } = useSession();
+  if (!user) return null;
   const Home = HOME_BY_ROLE[user.role];
   return <Home />;
 }

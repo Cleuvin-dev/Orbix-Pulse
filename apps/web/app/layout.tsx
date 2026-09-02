@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from "next";
 
-import { Sidebar } from "@/components/layout/sidebar";
-import { Topbar } from "@/components/layout/topbar";
+import { AppShell } from "@/components/layout/app-shell";
 import { ThemeProvider } from "@/components/theme-provider";
-import { DevSessionProvider } from "@/lib/dev-session";
+import { SessionProvider } from "@/lib/session";
 
 import "./globals.css";
 
@@ -21,15 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" suppressHydrationWarning>
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <DevSessionProvider>
-            <div className="flex h-screen">
-              <Sidebar />
-              <div className="flex flex-1 flex-col overflow-hidden">
-                <Topbar />
-                <main className="flex-1 overflow-y-auto bg-secondary/40 p-6">{children}</main>
-              </div>
-            </div>
-          </DevSessionProvider>
+          <SessionProvider>
+            <AppShell>{children}</AppShell>
+          </SessionProvider>
         </ThemeProvider>
       </body>
     </html>
