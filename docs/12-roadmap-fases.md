@@ -123,8 +123,62 @@ comentário em `default-role-permissions.ts`):
 
 **Referências:** `03-modelo-dados.md`, `04-regras-negocio.md`
 
-- CRUD de produtos, categorias, códigos de barras
-- Leitura via código de barras (USB no PC, câmera no mobile)
+- CRUD de produtos, categorias, códigos de barras — feito em 2026-09-02, só
+  backend. Schema já existia (Fase 1), sem migration nova.
+  - `apps/api/src/application/products/products.service.ts` +
+    `product-categories.service.ts`: sempre filtram por `tenantId` do usuário
+    autenticado; `categoryId`/`supplierId` no payload são validados contra o
+    tenant antes de aceitar (nunca confia em UUID vindo do cliente —
+    CLAUDE.md regra 4). `current_stock` nunca é aceito no payload de
+    criação/edição — é cache derivado de `stock_movements`
+    (docs/03-modelo-dados.md, 3.3), fica em 0 até a Fase 5 existir. Exclusão
+    de produto/categoria/código de barras é sempre `deletedAt` (soft delete).
+  - Categorias: ciclo na hierarquia (`A vira filho de B, que já é filho de A`)
+    é detectado e rejeitado subindo a cadeia de pais.
+  - Fase explicitamente **online-only**, sem `operation_id`/fila de sync — o
+    mesmo tratamento que Fase 6 (PDV) já recebe no roadmap ("ainda
+    online-only nesta fase"); sync de produtos fica pra Fase 9.
+  - Rotas protegidas por `SupabaseAuthGuard` + `PermissionGuard` — primeira
+    rota de negócio real usando a infra da Fase 3 (que ficou pronta sem
+    nenhum consumidor até aqui).
+- Leitura via código de barras (USB no PC, câmera no mobile) — feito o lado
+  backend: `GET /v1/products/barcode/:code` resolve um código escaneado pro
+  produto (o leitor USB emula teclado, então a UI só precisa capturar o texto
+  digitado e chamar essa rota — não tratado aqui, é frontend). Leitura via
+  câmera (mobile) também é 100% frontend (`getUserMedia` + lib de decodificação),
+  nenhuma diferença no contrato da API.
+
+**Lacunas sinalizadas** (não resolvidas silenciosamente — `default-role-permissions.ts`
+e os controllers têm o mesmo comentário):
+- `docs/05-permissoes-rbac.md` (5.4) não tem uma permissão `products.create`
+  nem nenhuma permissão de categoria — só `products.view/update/delete`.
+  Criar produto e qualquer operação de categoria reaproveitam
+  `products.update`/`products.view`/`products.delete` (mesmos roles:
+  OWNER/ADMIN/MANAGER podem, os demais não). Se o blueprint quiser distinguir
+  "criar" de "editar" no futuro, isso precisa de uma entrada nova na matriz.
+- Testes desta fase são unitários (Prisma mockado) + um teste de integração
+  HTTP do pipeline completo (auth + RBAC) numa rota real — mesma limitação já
+  registrada na Fase 3: sem banco de testes isolado ainda (`10-testes.md`, 10.6).
+
+**Bug de tooling real, encontrado e corrigido**: `packages/types` e
+`packages/validation` são pacotes `"type": "module"` com um `index.ts` que
+reexporta de arquivos irmãos (`export {...} from "./role"`, sem extensão).
+Isso nunca tinha quebrado porque, até esta fase, tudo que o `apps/api`
+importava desses pacotes era `import type` (apagado em tempo de compilação,
+nunca vira um `require()` de verdade em runtime). Assim que
+`apps/api/src/controllers/products` passou a importar um **valor** real
+(`createProductSchema` etc.), o `nest start` (Node 24, que faz type-stripping
+nativo de `.ts` e detecta sintaxe ESM automaticamente) tentou resolver
+`./barcode` pelo resolvedor estrito de ESM do Node, que exige extensão de
+arquivo — e quebrou com `ERR_MODULE_NOT_FOUND`. `apps/web`/Vitest nunca
+sentem isso porque Next.js/Vite fazem a própria resolução de módulos, não a
+do Node. Corrigido consolidando cada pacote num único `src/index.ts` sem
+imports relativos internos (não custou nada — os pacotes são pequenos).
+**Vale lembrar ao criar um novo pacote compartilhado**: se algo de dentro dele
+for importado como valor real (não só tipo) por `apps/api`, evite barrel file
+com reexport relativo entre arquivos — ou use extensão explícita `.ts` nos
+imports (exige `allowImportingTsExtensions`, incompatível com o `noEmit: false`
+que `apps/api` precisa pra buildar — não tentar essa rota).
 
 ## Fase 5 — Estoque
 
