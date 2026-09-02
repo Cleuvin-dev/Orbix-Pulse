@@ -165,24 +165,26 @@ model Tenant {
   updatedAt DateTime     @updatedAt @map("updated_at")
   deletedAt DateTime?    @map("deleted_at")
 
-  branches          Branch[]
-  devices           Device[]
-  userRoles         UserRole[]
-  productCategories ProductCategory[]
-  products          Product[]
-  barcodes          Barcode[]
-  stockMovements    StockMovement[]
-  customers         Customer[]
-  suppliers         Supplier[]
-  sales             Sale[]
-  saleItems         SaleItem[]
-  payments          Payment[]
-  cashRegisters     CashRegister[]
-  financeCategories FinanceCategory[]
-  financeEntries    FinanceEntry[]
-  fiscalDocuments   FiscalDocument[]
-  auditLogs         AuditLog[]
-  syncOperations    SyncOperation[]
+  branches                Branch[]
+  devices                 Device[]
+  userRoles               UserRole[]
+  rolePermissions         RolePermission[]
+  userPermissionOverrides UserPermissionOverride[]
+  productCategories       ProductCategory[]
+  products                Product[]
+  barcodes                Barcode[]
+  stockMovements          StockMovement[]
+  customers               Customer[]
+  suppliers               Supplier[]
+  sales                   Sale[]
+  saleItems               SaleItem[]
+  payments                Payment[]
+  cashRegisters           CashRegister[]
+  financeCategories       FinanceCategory[]
+  financeEntries          FinanceEntry[]
+  fiscalDocuments         FiscalDocument[]
+  auditLogs               AuditLog[]
+  syncOperations          SyncOperation[]
 
   @@map("tenants")
 }
@@ -230,7 +232,7 @@ model Device {
 }
 
 // ---------------------------------------------------------------------------
-// Usuários e papéis (RBAC granular chega na Fase 3 — aqui só role por tenant)
+// Usuários, papéis e RBAC granular (docs/05-permissoes-rbac.md)
 // ---------------------------------------------------------------------------
 
 model User {
@@ -244,8 +246,9 @@ model User {
   updatedAt DateTime   @updatedAt @map("updated_at")
   deletedAt DateTime?  @map("deleted_at")
 
-  roles   UserRole[]
-  devices Device[]
+  roles               UserRole[]
+  devices             Device[]
+  permissionOverrides UserPermissionOverride[]
 
   @@map("users")
 }
@@ -265,6 +268,52 @@ model UserRole {
   @@unique([userId, tenantId])
   @@index([tenantId])
   @@map("user_roles")
+}
+
+// Permissão padrão de um role dentro de um tenant (docs/05-permissoes-rbac.md,
+// 5.1 e 5.4) — seed inicial reflete a matriz do blueprint, mas cada tenant pode
+// customizar (ex: dono libera uma permissão extra pra um gerente específico via
+// UserPermissionOverride, não editando esta tabela por usuário).
+model RolePermission {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  role       Role
+  // formato "recurso.acao" (docs/05-permissoes-rbac.md, 5.3) — sem tabela de
+  // catálogo separada por simplicidade; não há hoje necessidade de metadados
+  // adicionais por permissão além da própria string.
+  permission String
+  granted    Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, role, permission])
+  @@index([tenantId])
+  @@map("role_permissions")
+}
+
+// Override pontual por usuário (docs/05-permissoes-rbac.md, 5.1: "um dono pode
+// dar permissão extra a um gerente específico") — tem prioridade sobre
+// RolePermission quando presente. granted=false revoga uma permissão que o
+// role do usuário normalmente teria.
+model UserPermissionOverride {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  permission String
+  granted    Boolean
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, permission])
+  @@index([tenantId])
+  @@map("user_permission_overrides")
 }
 
 // ---------------------------------------------------------------------------

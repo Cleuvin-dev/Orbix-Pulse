@@ -75,9 +75,49 @@ Cada fase deve ser entregue ao Claude Code **isoladamente**, referenciando os do
 
 **Referências:** `05-permissoes-rbac.md`
 
-- Tabelas `role_permissions` / overrides por usuário
-- Middleware `CanPerform` no backend
-- Testes: matriz completa de permissões por role (ver `10-testes.md`)
+- Tabelas `role_permissions` / overrides por usuário — feito em 2026-09-02:
+  `RolePermission` (permissão padrão por role dentro de um tenant) e
+  `UserPermissionOverride` (grant/revoke pontual por usuário, prioridade sobre
+  o role) no `schema.prisma`, migration `20260902092100_add_role_permissions`.
+  Seed (`apps/api/prisma/seed.ts`) popula `role_permissions` do tenant de teste
+  a partir da matriz de `05-permissoes-rbac.md` (5.4), transcrita em
+  `apps/api/src/application/permissions/default-role-permissions.ts` — 62 linhas,
+  conferidas uma a uma contra a tabela do blueprint.
+- Middleware `CanPerform` no backend — feito:
+  `CanPerformService.check(user, permission)` (fail-closed: nega por padrão se
+  não houver `role_permission`/override) + `PermissionGuard` +
+  `@RequirePermission("recurso.acao")`, sempre depois de `SupabaseAuthGuard`
+  (`@UseGuards(SupabaseAuthGuard, PermissionGuard)`). Tentativa negada grava em
+  `audit_log` (`action: "PERMISSION_DENIED"`, `entity: "user"` — não há uma
+  entidade de negócio específica sendo acessada numa checagem de permissão em
+  si, então o próprio usuário é o "entity" auditado) e responde `403`, conforme
+  `docs/09-api.md` (9.3).
+- Testes: matriz completa de permissões por role — feito: teste data-driven
+  cobrindo todo role × toda permissão da matriz (136 casos) + o caso literal do
+  blueprint (`10-testes.md`, 10.3: CASHIER não vê `finance.view_profit`) + teste
+  de integração HTTP real do pipeline `SupabaseAuthGuard → PermissionGuard`
+  (controller de teste descartável, nunca registrado nas rotas reais). 163
+  testes no total em `apps/api` (incluindo os da Fase 2).
+
+**Simplificações sinalizadas, não resolvidas pelo blueprint ainda** (ver
+comentário em `default-role-permissions.ts`):
+- `sales.cancel`/`fiscal.cancel` do MANAGER são "política\*" no blueprint
+  (configurável por tenant, ex: até X horas após a venda) — isso é regra de
+  negócio contextual, não uma permissão binária. Por ora MANAGER recebe a
+  permissão concedida sem a janela de tempo; a política real só faz sentido
+  quando o domínio de Vendas existir (Fase 4+).
+- `finance.view` do CASHIER é "limitado\*\*" (só a sessão de caixa aberta
+  própria) — é filtro de linha, não negação de rota. CASHIER recebe a
+  permissão concedida; o filtro fica para quando a consulta financeira existir
+  (Fase 5+).
+- Nenhuma rota de negócio real usa `@RequirePermission` ainda, porque nenhuma
+  existe (Fase 4+ não implementada) — a infraestrutura está pronta e testada,
+  falta só aplicar `@UseGuards(SupabaseAuthGuard, PermissionGuard)` +
+  `@RequirePermission(...)` em cada rota conforme ela for criada.
+- Teste da matriz roda com Prisma mockado (sem banco de testes isolado
+  configurado ainda — `10-testes.md`, 10.6). Cobre a lógica de
+  `CanPerformService` fielmente ao que roda em produção, mas não é um teste de
+  integração contra Postgres de verdade.
 
 ## Fase 4 — Produtos e catálogo
 

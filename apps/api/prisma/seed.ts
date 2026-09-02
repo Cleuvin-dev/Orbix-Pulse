@@ -1,5 +1,7 @@
 import { PrismaClient, Role } from "@prisma/client";
 
+import { DEFAULT_ROLE_PERMISSIONS } from "../src/application/permissions/default-role-permissions";
+
 const prisma = new PrismaClient();
 
 const ROLES: Role[] = [
@@ -56,6 +58,16 @@ async function main() {
     });
   }
 
+  for (const role of ROLES) {
+    for (const permission of DEFAULT_ROLE_PERMISSIONS[role]) {
+      await prisma.rolePermission.upsert({
+        where: { tenantId_role_permission: { tenantId: tenant.id, role, permission } },
+        update: { granted: true },
+        create: { tenantId: tenant.id, role, permission, granted: true },
+      });
+    }
+  }
+
   const owner = await prisma.user.findUniqueOrThrow({
     where: { email: "owner@orbixpulse.dev" },
   });
@@ -72,7 +84,10 @@ async function main() {
     },
   });
 
-  console.log(`Seed concluído: tenant "${tenant.name}", 1 filial, 1 device, ${ROLES.length} usuários.`);
+  const permissionCount = ROLES.reduce((sum, role) => sum + DEFAULT_ROLE_PERMISSIONS[role].length, 0);
+  console.log(
+    `Seed concluído: tenant "${tenant.name}", 1 filial, 1 device, ${ROLES.length} usuários, ${permissionCount} role_permissions.`,
+  );
 }
 
 main()
