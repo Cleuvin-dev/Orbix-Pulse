@@ -361,9 +361,74 @@ que `apps/api` precisa pra buildar — não tentar essa rota).
 
 **Referências:** `06-offline-first.md`
 
-- Service Worker + PWA instalável
-- Dexie/IndexedDB com o subconjunto de entidades necessário
-- Sincronização seletiva por permissão (dispositivo baixa só o que o usuário pode ver)
+Primeira fase majoritariamente **frontend** (`apps/web`) desde a Fase 2 — as
+Fases 3-7 foram todas backend, com as telas ainda em mock.
+
+- Service Worker + PWA instalável — feito em 2026-09-02.
+  `app/manifest.ts` (convenção nativa do Next.js, serve
+  `/manifest.webmanifest`), `app/icon.svg` (ícone da marca — mesmo gradiente
+  de `bg-brand-gradient` já usado no sidebar/login), Service Worker via
+  Serwist (`serwist`/`@serwist/next`) configurado em `app/sw.ts` +
+  `next.config.mjs`, registrado no client via
+  `components/service-worker-register.tsx`. **Desligado em dev de propósito**
+  (`disable: NODE_ENV === "development"` — recarregar o SW a cada mudança de
+  código atrapalharia o hot reload); só existe de verdade em build de
+  produção. Testado com `pnpm build && pnpm start` + Playwright real:
+  `navigator.serviceWorker.ready` resolve com `active: true`.
+  **Bug real de tooling, achado e contornado**: a abordagem inicial (ícone
+  gerado via `next/og`/`ImageResponse`, com `generateImageMetadata` pra
+  192px/512px) quebrava em runtime nesta máquina (Windows + pnpm) — bug
+  interno do Next.js 14.2.x (`next/dist/server/og/image-response.js`) que
+  tenta carregar a fonte padrão do pacote (mesmo sem texto no ícone, mesmo
+  passando `fonts: []`) e monta uma `file://` URL inválida a partir do
+  caminho aninhado do pnpm (`node_modules/.pnpm/...`). Não é um bug do meu
+  código — é do bundle interno do Next. Contornado trocando pra um
+  `icon.svg` estático (convenção nativa do Next, não passa pelo código do
+  `next/og`). Efeito colateral: sem `apple-icon` (Safari não aceita SVG
+  nessa tag) — iOS cai no comportamento padrão (screenshot) ao instalar, uma
+  limitação real, não escondida.
+- Dexie/IndexedDB com o subconjunto de entidades necessário — feito:
+  `apps/web/lib/db/schema.ts`, exatamente as 10 tabelas de
+  `docs/06-offline-first.md` (6.5): products, customers, suppliers, sales,
+  sale_items, stock_movements, payments, cash_registers, sync_queue,
+  app_metadata. `sync_queue` fica sempre vazia até o Sync Engine real
+  (Fase 9) escrever operações nela a partir de ações offline — não
+  implementado ainda, e o indicador de status reflete isso honestamente (não
+  finge uma fila que não existe).
+- Sincronização seletiva por permissão — feito:
+  `apps/web/lib/sync/hydrate.ts`. **Decisão importante**: o frontend não
+  duplica a lógica de "quem pode ver o quê" — só chama os endpoints normais
+  (os mesmos das Fases 4-7) com o token do usuário, e deixa o `PermissionGuard`
+  do backend decidir. Um 403 numa entidade só significa que ela não entra no
+  banco local, silenciosamente — é assim que "seletividade por permissão"
+  funciona sem violar CLAUDE.md regra 1 (nada de regra de negócio crítica no
+  frontend). Disparada uma vez por login (`SyncProvider`, hook em
+  `useSession().status === "authenticated"`), e o banco local é **limpo por
+  completo no logout** (`clearLocalDatabase()`) — decisão de segurança: um
+  dispositivo compartilhado (PC do caixa) não pode manter dado de negócio do
+  usuário anterior visível depois da troca de conta, isso não está escrito
+  literalmente no doc mas segue o princípio de 6.4 ("reduz superfície de
+  exposição de dados sensíveis").
+  - Testado ponta a ponta com login real: hidratação populou 2 produtos, 2
+    vendas, 6 movimentos de estoque, 1 caixa — dados reais das Fases 4-6.
+    Logout confirmado limpando tudo (produtos: 0 depois).
+  - **Só as entidades que já têm endpoint de leitura** (produtos, vendas,
+    movimentos de estoque, caixa atual) são hidratadas. `customers`/`suppliers`
+    ficam com tabela vazia — não têm CRUD implementado em nenhuma fase ainda
+    (`Customer`/`Supplier` existem no schema desde a Fase 1, mas sem
+    controller). Sinalizado, não esquecido.
+- Indicador de status (`docs/06-offline-first.md`, 6.6) — o
+  `SyncStatusIndicator` que já existia como mock (Fase 0) foi religado pro
+  estado real (`SyncProvider`): 🟢/🟠/🔴 refletem `navigator.onLine` de
+  verdade + a contagem real (hoje sempre 0) da fila local.
+- **Fora de escopo de propósito, fica pra Fase 9 (Sync Engine)**: nenhuma
+  tela foi religada pra LER do Dexie em vez do mock — Produtos/Estoque/
+  Vendas/Financeiro continuam mostrando dado mock na UI (a hidratação
+  funciona e prova o mecanismo, mas nenhuma tela consome o banco local
+  ainda). Escrita offline (criar venda sem internet, fila de operações
+  pendentes, retry) também não existe — isso é literalmente o que a Fase 9
+  constrói (`POST /sync/batch`, idempotência do lado do sync, resolução de
+  conflito).
 
 ## Fase 9 — Sync Engine
 

@@ -39,3 +39,8 @@ test-results/
 # Supabase local
 infrastructure/supabase/.branches/
 infrastructure/supabase/.temp/
+
+# Service Worker gerado pelo Serwist (build de produção — docs/06-offline-first.md)
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+apps/web/public/swe-worker-*.js

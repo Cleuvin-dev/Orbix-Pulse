@@ -7,5 +7,9 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  // app/sw.ts roda no escopo de Service Worker (self: ServiceWorkerGlobalScope),
+  // que exige a lib "WebWorker" — incompatível com "DOM" usada pelo resto do
+  // app Next.js no mesmo tsconfig. O bundler do Serwist compila esse arquivo
+  // separadamente (não depende do tsc daqui pra funcionar em runtime).
+  "exclude": ["node_modules", "app/sw.ts"]
 }
