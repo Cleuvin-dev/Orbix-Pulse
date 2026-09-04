@@ -2,8 +2,11 @@
   "$schema": "https://turbo.build/schema.json",
   "globalEnv": ["DATABASE_URL", "PORT", "SUPABASE_URL", "SUPABASE_SECRET_KEY"],
   "tasks": {
+    "db:generate": {
+      "cache": false
+    },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "db:generate"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": {
