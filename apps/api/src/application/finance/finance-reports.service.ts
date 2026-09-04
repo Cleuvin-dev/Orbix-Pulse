@@ -1,11 +1,7 @@
 import { Injectable } from "@nestjs/common";
+import type { FinancePeriodQuery } from "@orbix/validation";
 
 import { PrismaService } from "../../infrastructure/database/prisma.service";
-
-export interface PeriodQuery {
-  from: Date;
-  to: Date;
-}
 
 @Injectable()
 export class FinanceReportsService {
@@ -13,7 +9,7 @@ export class FinanceReportsService {
 
   // Fluxo de caixa: visão agregada sobre finance_entries + sales + payments,
   // não uma tabela própria (docs/04-regras-negocio.md, 4.6).
-  async cashFlow(tenantId: string, period: PeriodQuery) {
+  async cashFlow(tenantId: string, period: FinancePeriodQuery) {
     const [salesInflow, receivablesInflow, payablesOutflow] = await Promise.all([
       this.prisma.payment.aggregate({
         where: {
@@ -58,7 +54,7 @@ export class FinanceReportsService {
   //   — sale_items não guarda um snapshot de custo (só unit_price, que é
   //   preço de venda). Se o custo mudar depois, o DRE de períodos passados
   //   muda junto — isso é uma aproximação, não o valor histórico exato.
-  async dre(tenantId: string, period: PeriodQuery) {
+  async dre(tenantId: string, period: FinancePeriodQuery) {
     const [salesRevenue, saleItemsForCmv, revenueEntries, costEntries, expenseEntries] = await Promise.all([
       this.prisma.sale.aggregate({
         where: { tenantId, status: { not: "CANCELLED" }, createdAt: { gte: period.from, lte: period.to } },
