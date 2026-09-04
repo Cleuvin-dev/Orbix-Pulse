@@ -35,11 +35,19 @@ Cada fase deve ser entregue ao Claude Code **isoladamente**, referenciando os do
   `ResolveCurrentUserService` (`apps/api/src/application/auth`) nunca confia em
   `tenant_id` vindo do cliente; resolve via `user_roles` no banco, com suporte a
   usuário multi-tenant via header `X-Tenant-Id` (rejeitado se o vínculo não existir).
-- RLS básico no Supabase como segunda camada de defesa — **ainda não aplicável**:
-  o banco de dados de negócio continua no Postgres local via Docker
-  (`infrastructure/docker/docker-compose.yml`), não no Postgres do Supabase. O
-  Supabase desta fase é usado só para Auth. RLS nas tabelas de negócio só faz
-  sentido quando/se o banco migrar para o Supabase — reavaliar nessa migração.
+- **Decisão revista em 2026-09-04**: o banco de negócio passou a rodar também no
+  Postgres do próprio projeto Supabase em produção (Vercel) — motivo prático:
+  ambiente de deploy serverless não tem acesso ao Postgres local via Docker, que
+  só existe na máquina de dev. Dev local continua usando o Postgres via Docker
+  (`infrastructure/docker/docker-compose.yml`); produção usa
+  `DATABASE_URL`/`DIRECT_URL` apontando para o pooler do Supabase (`schema.prisma`
+  ganhou `directUrl` — migrations exigem conexão em modo sessão, não a de
+  transação usada em runtime). Migrations e seed de dev já aplicados no Supabase
+  em 2026-09-04.
+- RLS básico no Supabase como segunda camada de defesa — **ainda não aplicável**,
+  mesmo com o banco agora rodando lá: a aplicação continua sendo a única fonte de
+  isolamento por `tenant_id` (regra 4 do `CLAUDE.md`). RLS ficaria como camada
+  extra de defesa, não implementado ainda — reavaliar como item futuro.
 - Login real na UI (`apps/web`) — feito em 2026-09-01, além do escopo original
   dos 3 itens acima (mas natural para a fase estar realmente utilizável):
   - `apps/web/lib/supabase/client.ts` — cliente Supabase de browser (só a chave
