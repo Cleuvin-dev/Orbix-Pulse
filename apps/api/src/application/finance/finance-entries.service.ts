@@ -14,6 +14,26 @@ export interface ListFinanceEntriesFilters {
 
 const MAX_PAGE_SIZE = 100;
 
+type EntryWithStatus = { status: Prisma.FinanceEntryGetPayload<object>["status"]; dueDate: Date };
+
+// `OVERDUE` existe no enum desde a Fase 1, mas nenhuma transição de estado
+// jamais o gravava — e docs/04-regras-negocio.md (4.6) não descreve quem o
+// escreveria. "Vencido" não é um estado de negócio próprio: é `PENDING` que
+// passou do vencimento, uma função do relógio, não de uma ação do usuário.
+// Por isso é derivado na leitura em vez de persistido: gravar exigiria um job
+// agendado (infra que não existe) e um GET nunca deve ter efeito colateral de
+// escrita. O banco continua guardando `PENDING` — que é o estado acionável —
+// e os guards de escrita (update/markPaid/cancel) checam PAID/CANCELLED
+// explicitamente, então um lançamento derivado como OVERDUE continua sendo
+// tratado como pendente por eles, que é o comportamento correto.
+// Lacuna sinalizada em docs/12-roadmap-fases.md (Fase 7).
+function withDerivedStatus<T extends EntryWithStatus>(entry: T, now: Date): T {
+  if (entry.status === "PENDING" && entry.dueDate < now) {
+    return { ...entry, status: "OVERDUE" };
+  }
+  return entry;
+}
+
 // Contas a pagar/receber (docs/04-regras-negocio.md, 4.6) — lançamentos
 // independentes de venda. Sem idempotência forçada por operation_id: campo
 // opcional no schema (Fase 1), fase online-only como Produtos (Fase 4).
@@ -42,7 +62,13 @@ export class FinanceEntriesService {
       this.prisma.financeEntry.count({ where }),
     ]);
 
-    return { items, total, page: filters.page, pageSize };
+    const now = new Date();
+    return {
+      items: items.map((entry) => withDerivedStatus(entry, now)),
+      total,
+      page: filters.page,
+      pageSize,
+    };
   }
 
   async findByIdOrThrow(tenantId: string, id: string) {
@@ -51,7 +77,7 @@ export class FinanceEntriesService {
       include: { category: true },
     });
     if (!entry) throw new NotFoundException("Lançamento financeiro não encontrado.");
-    return entry;
+    return withDerivedStatus(entry, new Date());
   }
 
   async create(tenantId: string, userId: string, input: CreateFinanceEntryInput) {
