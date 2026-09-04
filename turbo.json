@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["DATABASE_URL", "PORT", "SUPABASE_URL", "SUPABASE_SECRET_KEY"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
