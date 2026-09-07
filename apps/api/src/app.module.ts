@@ -9,6 +9,7 @@ import { ProductsModule } from "./controllers/products/products.module";
 import { ReportsModule } from "./controllers/reports/reports.module";
 import { SalesModule } from "./controllers/sales/sales.module";
 import { StockModule } from "./controllers/stock/stock.module";
+import { SuppliersModule } from "./controllers/suppliers/suppliers.module";
 import { SyncModule } from "./controllers/sync/sync.module";
 import { TenantsModule } from "./controllers/tenants/tenants.module";
 import { UsersModule } from "./controllers/users/users.module";
@@ -27,6 +28,7 @@ import { PrismaModule } from "./infrastructure/database/prisma.module";
     SalesModule,
     FinanceModule,
     ReportsModule,
+    SuppliersModule,
     SyncModule,
     TenantsModule,
     UsersModule,

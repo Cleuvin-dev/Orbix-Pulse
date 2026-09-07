@@ -210,3 +210,19 @@ export const updateTenantSettingsSchema = z.object({
   saleCancelWindowHours: z.number().int().nonnegative().optional(),
 });
 export type UpdateTenantSettingsInput = z.infer<typeof updateTenantSettingsSchema>;
+
+// docs/03-modelo-dados.md (3.3, "suppliers") — cadastro existe desde a Fase 1,
+// mas sem CRUD implementado em fase nenhuma até agora (sinalizado em
+// docs/12-roadmap-fases.md). "Pedidos de compra" continua fora: não tem
+// entidade de banco definida, lacuna estrutural à parte, não resolvida aqui.
+export const createSupplierSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  document: z.string().trim().max(32).nullish(),
+  email: z.string().trim().max(200).nullish(),
+  phone: z.string().trim().max(32).nullish(),
+  address: z.string().trim().max(300).nullish(),
+  isActive: z.boolean().optional(),
+});
+export const updateSupplierSchema = createSupplierSchema.partial();
+export type CreateSupplierInput = z.infer<typeof createSupplierSchema>;
+export type UpdateSupplierInput = z.infer<typeof updateSupplierSchema>;

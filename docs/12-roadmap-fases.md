@@ -501,9 +501,28 @@ Fases 3-7 foram todas backend, com as telas ainda em mock.
     Logout confirmado limpando tudo (produtos: 0 depois).
   - **Só as entidades que já têm endpoint de leitura** (produtos, vendas,
     movimentos de estoque, caixa atual) são hidratadas. `customers`/`suppliers`
-    ficam com tabela vazia — não têm CRUD implementado em nenhuma fase ainda
-    (`Customer`/`Supplier` existem no schema desde a Fase 1, mas sem
-    controller). Sinalizado, não esquecido.
+    ficam com tabela vazia — `suppliers` ganhou CRUD em 2026-09-07 (ver nota
+    abaixo), mas a hidratação seletiva desta fase não foi re-executada pra
+    incluir o endpoint novo (fora de escopo desta atualização pontual).
+    `customers` continua sem controller nenhum, sinalizado, não esquecido.
+
+**Nota (2026-09-07) — Fornecedores religado (Compras), pedidos de compra
+continua bloqueado.** `Supplier` existe no schema desde a Fase 1, mas sem
+CRUD implementado em fase nenhuma — mesmo tipo de pendência sinalizada que
+"listar usuários" era pra Fase 2, não uma fase nova. `GET/POST/PATCH/DELETE
+/v1/suppliers` (`apps/api/src/application/suppliers/`), sem permissão
+dedicada em `docs/05-permissoes-rbac.md` (5.4) — reaproveita
+`products.view`/`update`/`delete`, mesmo padrão de `product-categories`
+(Fase 4): fornecedor é sub-recurso do catálogo (`products.supplier_id`).
+`apps/web/app/compras/page.tsx`: CRUD completo (criar, editar, excluir com
+soft delete) contra `/v1/suppliers` real, mesmo padrão de formulário da
+tela de Produtos. **"Pedidos de compra" continua exatamente como estava**
+— não existe entidade de pedido de compra no schema, lacuna estrutural que
+não foi resolvida aqui (só o bloco de Fornecedores saiu do mock). Testado
+ponta a ponta com Playwright real: criar fornecedor → editar (inativar) →
+persiste após reload → excluir → some da lista → aviso de "pedidos de
+compra" continua visível, honesto, não virou dado fake. 276 testes de
+`apps/api` agora (+4 de `SuppliersService`).
 - Indicador de status (`docs/06-offline-first.md`, 6.6) — o
   `SyncStatusIndicator` que já existia como mock (Fase 0) foi religado pro
   estado real (`SyncProvider`): 🟢/🟠/🔴 refletem `navigator.onLine` de
