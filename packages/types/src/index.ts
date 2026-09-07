@@ -58,6 +58,10 @@ export const STOCK_MOVEMENT_TYPES = [
 ] as const;
 export type StockMovementType = (typeof STOCK_MOVEMENT_TYPES)[number];
 
+// Espelha o enum UserStatus de apps/api/prisma/schema.prisma (docs/03-modelo-dados.md, 3.3 — users).
+export const USER_STATUSES = ["ACTIVE", "INACTIVE", "SUSPENDED"] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
+
 // Identidade resolvida pelo backend a partir do JWT do Supabase (docs/09-api.md, 9.2).
 // Formato de resposta de GET /v1/auth/me — nunca inclui permissões cruas do
 // cliente, tenant_id/role sempre vêm do banco (docs/02-arquitetura.md, 2.6).

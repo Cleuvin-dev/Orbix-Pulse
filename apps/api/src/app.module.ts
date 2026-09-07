@@ -10,6 +10,7 @@ import { ReportsModule } from "./controllers/reports/reports.module";
 import { SalesModule } from "./controllers/sales/sales.module";
 import { StockModule } from "./controllers/stock/stock.module";
 import { SyncModule } from "./controllers/sync/sync.module";
+import { UsersModule } from "./controllers/users/users.module";
 import { SupabaseAuthModule } from "./infrastructure/auth/supabase-auth.module";
 import { PrismaModule } from "./infrastructure/database/prisma.module";
 
@@ -26,6 +27,7 @@ import { PrismaModule } from "./infrastructure/database/prisma.module";
     FinanceModule,
     ReportsModule,
     SyncModule,
+    UsersModule,
   ],
   controllers: [HealthController],
 })

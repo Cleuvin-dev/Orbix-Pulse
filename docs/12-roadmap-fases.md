@@ -68,16 +68,32 @@ Cada fase deve ser entregue ao Claude Code **isoladamente**, referenciando os do
     front espera).
   - O antigo seletor "Ver como: {role}" no topbar (mock) foi **removido**,
     substituído por um menu de usuário real (nome/e-mail/badge de role + Sair).
-    A tela de Usuários e Permissões (`apps/web/app/usuarios/page.tsx`) continua
-    com dados de demonstração estáticos (`apps/web/lib/demo-users.ts`) — listar
-    os usuários reais do tenant via API é trabalho futuro, fora do escopo aqui.
+    A tela de Usuários e Permissões (`apps/web/app/usuarios/page.tsx`)
+    **religada em 2026-09-07** — ver nota abaixo, "trabalho futuro" concluído.
   - **Verificado de ponta a ponta em navegador real (2026-09-02)**: usando o
     Playwright já presente em `tests/e2e` (spec temporário, rodado e descartado,
     nunca commitado) — redirect pra `/login` quando deslogado, mensagem de erro
     em credenciais erradas, login certo leva ao dashboard com dado real (tenant,
     nome, e-mail, role), dropdown do usuário com logout, sessão sobrevive a F5.
     Login de teste: `owner@orbixpulse.dev` / `OrbixDev123!` (ou qualquer um dos
-    8 e-mails de `apps/api/prisma/seed.ts`, mesma senha). Fase 2 sem pendências.
+    8 e-mails de `apps/api/prisma/seed.ts`, mesma senha).
+  - **Listagem/gestão de usuários religada em 2026-09-07**: `GET /v1/users`
+    (`apps/api/src/application/users/users.service.ts`) lista os usuários
+    reais do tenant a partir de `user_roles`, e `PATCH /v1/users/:id/role`
+    troca o papel de um usuário — ambos atrás de `users.manage`
+    (OWNER/ADMIN, igual `apps/web/lib/nav-modules.ts` já restringia o menu).
+    `docs/05-permissoes-rbac.md` (5.2: "OWNER — acesso total, não
+    removível/limitável") é respeitado literalmente: o backend rejeita trocar
+    o role de quem hoje é OWNER (`409`), e a UI nem mostra o seletor pra essa
+    linha. Mudança de role é auditada em `audit_log`
+    (`action: "USER_ROLE_CHANGED"`, antes/depois), conforme 5.8. Convite de
+    novo usuário (criar conta no Supabase Auth) fica de fora — feature maior,
+    não estava sinalizada como pendente, só a listagem estava.
+    `apps/web/lib/demo-users.ts` removido. `packages/types` ganhou
+    `UserStatus`/`USER_STATUSES` (não existia ainda). Testado ponta a ponta
+    com Playwright real: lista os 8 usuários seedados, troca o role de SELLER
+    pra STOCK, confirma persistência sobrevivendo a reload, e que a linha do
+    OWNER não tem seletor. Fase 2 sem pendências.
 
 ## Fase 3 — RBAC e permissões
 

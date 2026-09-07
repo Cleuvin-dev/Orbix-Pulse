@@ -1,4 +1,4 @@
-import { BARCODE_TYPES, FINANCE_CATEGORY_KINDS, FINANCE_ENTRY_TYPES, PAYMENT_METHODS } from "@orbix/types";
+import { BARCODE_TYPES, FINANCE_CATEGORY_KINDS, FINANCE_ENTRY_TYPES, PAYMENT_METHODS, ROLES } from "@orbix/types";
 import { z } from "zod";
 
 // Tudo num arquivo só de propósito: um import relativo (ex: "./barcode") sem
@@ -192,3 +192,11 @@ export const syncBatchSchema = z.object({
     .max(100),
 });
 export type SyncBatchInput = z.infer<typeof syncBatchSchema>;
+
+// docs/05-permissoes-rbac.md (5.8): mudança de role é auditada. OWNER é
+// "não removível/limitável" (5.2) — o backend (não este schema) rejeita
+// trocar o role de um usuário que hoje é OWNER.
+export const updateUserRoleSchema = z.object({
+  role: z.enum(ROLES),
+});
+export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
