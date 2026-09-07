@@ -609,6 +609,20 @@ compra" continua visível, honesto, não virou dado fake. 276 testes de
 
 **Referências:** `08-fiscal.md`
 
+**Status em 2026-09-07: bloqueada, aguardando decisão do usuário.** Não é
+falta de trabalho — é a primeira linha desta fase (escolha do provedor), que
+o próprio `docs/08-fiscal.md` diz explicitamente ser "decisão a ser tomada
+na Fase correspondente do roadmap", e o `CLAUDE.md` proíbe decidir sozinho
+por envolver conta/credenciais reais de serviço terceiro. Uma comparação de
+custo-benefício entre Focus NFe, eNotas e Tecnospeed/PlugNotas foi feita
+nesta data (cobertura, preço, reputação/SLA) e a recomendação foi Focus NFe
+(plano de varejo dedicado, preço público, melhor encaixe pro MVP de PDV) —
+usuário respondeu "não decidi ainda" duas vezes. **Não implementar nada
+desta fase até o usuário confirmar o provedor.** Enquanto isso, o usuário
+optou por religar as telas mock restantes que não dependiam dessa decisão
+(ver notas de Fase 11 abaixo, e Compras/Financeiro/Relatórios/Usuários/
+Configurações também religados fora desta fase).
+
 - Escolha final do provedor (Focus NFe / eNotas / Tecnospeed / NFe.io) após avaliação de cobertura/preço/SLA
 - Integração de emissão (NFC-e como prioridade para MVP de varejo)
 - Fluxo de status (`PENDING_ISSUANCE → PROCESSING → AUTHORIZED/REJECTED`)
