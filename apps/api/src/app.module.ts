@@ -6,6 +6,7 @@ import { FinanceModule } from "./controllers/finance/finance.module";
 import { HealthController } from "./controllers/health.controller";
 import { PermissionsModule } from "./controllers/permissions/permissions.module";
 import { ProductsModule } from "./controllers/products/products.module";
+import { ReportsModule } from "./controllers/reports/reports.module";
 import { SalesModule } from "./controllers/sales/sales.module";
 import { StockModule } from "./controllers/stock/stock.module";
 import { SyncModule } from "./controllers/sync/sync.module";
@@ -23,6 +24,7 @@ import { PrismaModule } from "./infrastructure/database/prisma.module";
     StockModule,
     SalesModule,
     FinanceModule,
+    ReportsModule,
     SyncModule,
   ],
   controllers: [HealthController],

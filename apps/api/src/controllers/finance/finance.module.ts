@@ -13,5 +13,6 @@ import { FinanceReportsController } from "./finance-reports.controller";
   imports: [AuthModule, PermissionsModule],
   controllers: [FinanceCategoriesController, FinanceEntriesController, FinanceReportsController],
   providers: [FinanceCategoriesService, FinanceEntriesService, FinanceReportsService],
+  exports: [FinanceReportsService],
 })
 export class FinanceModule {}

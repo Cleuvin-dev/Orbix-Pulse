@@ -583,8 +583,54 @@ Fases 3-7 foram todas backend, com as telas ainda em mock.
 
 **Referências:** `01-visao-produto.md` (seção 1.3), `05-permissoes-rbac.md`
 
-- Painel executivo (dono): faturamento, lucro, margem, top produtos, estoque crítico
-- Painel operacional (funcionário): atalhos de PDV/estoque
+Implementada em 2026-09-07, **fora de ordem** — Fase 10 (Fiscal) segue pendente da
+escolha de provedor pelo usuário (decisão estrutural, não posso tomar sozinho); o
+usuário optou explicitamente por avançar pra Fase 11 nesse meio tempo. Nada aqui
+depende de dado fiscal, então não há lacuna técnica real por pular a ordem — só a
+sinalização exigida pelo `CLAUDE.md` (regra 6).
+
+- Painel executivo (dono): faturamento, lucro, margem, top produtos, estoque
+  crítico — feito. Endpoint único `GET /v1/reports/dashboard?from=&to=`
+  (`apps/api/src/application/reports/reports.service.ts`), protegido por
+  `reports.executive.view` (já seedada desde a Fase 3, nunca consumida até
+  agora). Reaproveita `FinanceReportsService.dre` (Fase 7) pra
+  faturamento/lucro/margem e `StockMovementsService.alerts` (Fase 5) pra
+  estoque crítico, em vez de duplicar essa lógica — só agrega o que ainda não
+  existia em lugar nenhum: contagem de vendas, ticket médio, ranking dos 5
+  produtos mais vendidos por quantidade (soma de `sale_items.total`, que já é
+  o valor líquido da linha) e contagem de caixas `OPEN` no tenant agora.
+  `apps/web/components/home/executive-dashboard.tsx` (home do OWNER/ADMIN) e
+  `apps/web/app/relatorios/page.tsx` (com seletor de período, tabela de top
+  produtos, tabela de estoque crítico reaproveitando `GET /v1/stock/alerts`,
+  e detalhamento do DRE reaproveitando `GET /v1/finance/dre`) consomem esse
+  endpoint. Cada seção degrada independentemente em caso de `403` (mensagem
+  "Sem permissão: X" em vez de crashar a página) — necessário porque o menu de
+  navegação (`apps/web/lib/nav-modules.ts`, decidido na Fase 0/shell visual)
+  libera `/relatorios` pra FINANCE/ACCOUNTANT, mas a matriz de permissões
+  (5.4) só concede `reports.executive.view` a OWNER/ADMIN/MANAGER — mismatch
+  pré-existente do shell visual, não corrigido aqui (mudar o menu ou a matriz
+  seria uma decisão de escopo à parte). Testado ponta a ponta com Playwright
+  real: venda registrada agora aparece com valor real no faturamento (não
+  mock), MANAGER vê o mesmo endpoint filtrado em "hoje", ACCOUNTANT vê os
+  avisos de permissão em cada seção sem crash.
+- Painel operacional (funcionário): atalhos de PDV/estoque — feito, parcial.
+  `apps/web/components/home/operational-dashboard.tsx` (home do MANAGER)
+  virou real: "Vendas hoje" e "Produtos com estoque crítico" reaproveitam o
+  mesmo endpoint acima (filtrado no dia); "Caixas abertos" usa a contagem
+  nova (`openCashRegistersCount`, ponto-no-tempo, não filtrado por período).
+  O card mock "Pedidos de compra pendentes" foi **removido**, não substituído
+  por dado real — não existe entidade de pedido de compra no schema (mesma
+  lacuna já sinalizada na Fase 0/tela de Compras).
+- **Fora de escopo, sinalizado**: "Giro de estoque" (risco de ruptura,
+  sugestão de compra) do card da tela de Relatórios do shell visual (Fase 0)
+  não foi implementado — é `Pós-MVP` explícito
+  ("Inteligência de estoque: previsão de ruptura, sugestão de compra") no
+  fim deste roadmap, não faz parte da Fase 11. "Vendas por período" com
+  comparação entre períodos (também um card do shell visual) também não foi
+  construído — não está no texto da Fase 11 (só "faturamento, lucro, margem,
+  top produtos, estoque crítico"), ficaria pra uma iteração futura se o
+  usuário pedir. Relatório de compras (fornecedores, pedidos) segue fora,
+  mesma lacuna estrutural de sempre.
 
 ## Fase 12 — Auditoria
 
