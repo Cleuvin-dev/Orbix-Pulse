@@ -6,9 +6,12 @@ import { PrismaService } from "../../infrastructure/database/prisma.service";
 export class DevicesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(tenantId: string) {
+  // `includeInactive` existe só pra tela de Configurações (gestão de
+  // dispositivos) — o uso original deste endpoint (Vendas/Estoque escolherem
+  // um device automaticamente) continua vendo só ACTIVE por padrão.
+  list(tenantId: string, includeInactive = false) {
     return this.prisma.device.findMany({
-      where: { tenantId, deletedAt: null, status: "ACTIVE" },
+      where: { tenantId, deletedAt: null, ...(includeInactive ? {} : { status: "ACTIVE" }) },
       orderBy: { name: "asc" },
     });
   }

@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
+import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import type { CurrentUser as CurrentUserType } from "@orbix/types";
 
 import { DevicesService } from "../../application/branches/devices.service";
@@ -19,7 +19,7 @@ export class DevicesController {
 
   @Get()
   @RequirePermission("products.view")
-  list(@CurrentUser() user: CurrentUserType) {
-    return this.devices.list(user.tenantId);
+  list(@CurrentUser() user: CurrentUserType, @Query("includeInactive") includeInactive?: string) {
+    return this.devices.list(user.tenantId, includeInactive === "true");
   }
 }

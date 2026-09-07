@@ -26,4 +26,15 @@ describe("DevicesService", () => {
     });
     expect(result).toEqual([{ id: "device-1", name: "PC-CAIXA-01" }]);
   });
+
+  it("includeInactive=true lista todos os status, não só ACTIVE", async () => {
+    findMany.mockResolvedValue([]);
+
+    await service.list(TENANT_ID, true);
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { tenantId: TENANT_ID, deletedAt: null },
+      orderBy: { name: "asc" },
+    });
+  });
 });

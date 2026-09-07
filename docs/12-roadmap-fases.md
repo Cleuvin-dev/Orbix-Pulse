@@ -648,6 +648,38 @@ sinalização exigida pelo `CLAUDE.md` (regra 6).
   usuário pedir. Relatório de compras (fornecedores, pedidos) segue fora,
   mesma lacuna estrutural de sempre.
 
+**Nota (2026-09-07) — Configurações religada, não é uma fase nova.** A tela
+`apps/web/app/configuracoes/page.tsx` (mock desde a Fase 0) tinha três blocos:
+"Dados da empresa", "Integração fiscal" e "Dispositivos registrados", com o
+próprio botão dizendo "Configuração real chega nas Fases 2 e 10".
+- **Dados da empresa** (Fase 2/multi-tenant): `GET /v1/tenants/me` — feito,
+  exibição só-leitura de nome/CNPJ/plano/status reais.
+- **Configurações operacionais** (nova, mas não é fase nova — expõe as duas
+  únicas chaves de `tenant.settings` já lidas em produção desde as Fases 5/6
+  e nunca configuráveis por tela nenhuma): `allowNegativeStock`
+  (`docs/04-regras-negocio.md`, 4.2) e `saleCancelWindowHours`
+  (`docs/05-permissoes-rbac.md`, 5.5) — `PATCH /v1/tenants/me/settings`,
+  merge parcial preservando outras chaves futuras do JSON. Ambas atrás de
+  `settings.manage` (OWNER/ADMIN, bate com `nav-modules.ts`).
+- **Integração fiscal**: continua bloqueada, mensagem explícita apontando pra
+  Fase 10 (escolha de provedor pendente) em vez de inputs `disabled` com
+  dado fake.
+- **Dispositivos registrados**: `GET /v1/devices` (existia desde a Fase 6, só
+  devices `ACTIVE`) ganhou `?includeInactive=true` opcional — o uso original
+  (Vendas/Estoque escolherem device automaticamente) continua vendo só
+  `ACTIVE` por padrão, sem mudança de comportamento.
+- **Bug real encontrado e corrigido durante a implementação**: a primeira
+  versão sincronizava o formulário via `useEffect` depois que
+  `GET /v1/tenants/me` resolvia — se o usuário interagisse com o checkbox
+  bem no meio do carregamento inicial, o efeito rodava logo em seguida e
+  sobrescrevia a interação com o valor antigo do servidor (Playwright pegou
+  isso: salvar `saleCancelWindowHours=48` funcionou, mas o toggle de
+  `allowNegativeStock` voltava pro valor antigo após reload). Corrigido
+  extraindo `OperationalSettingsForm` como componente próprio que inicializa
+  `useState` direto dos props (só monta depois que `tenant` existe) — sem
+  `useEffect` nenhum, elimina a janela de corrida por construção.
+  `apps/web/app/configuracoes/mock-devices.ts` removido.
+
 ## Fase 12 — Auditoria
 
 **Referências:** `04-regras-negocio.md`, `05-permissoes-rbac.md` (seção 5.8)

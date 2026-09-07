@@ -200,3 +200,13 @@ export const updateUserRoleSchema = z.object({
   role: z.enum(ROLES),
 });
 export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
+
+// docs/04-regras-negocio.md (4.2: estoque negativo; 4.3/5.5: janela de
+// cancelamento do MANAGER) — as duas únicas chaves de tenant.settings lidas
+// em algum lugar do backend hoje (StockMovementsService, SalesService), mas
+// nunca configuráveis por nenhuma tela até esta fase.
+export const updateTenantSettingsSchema = z.object({
+  allowNegativeStock: z.boolean().optional(),
+  saleCancelWindowHours: z.number().int().nonnegative().optional(),
+});
+export type UpdateTenantSettingsInput = z.infer<typeof updateTenantSettingsSchema>;

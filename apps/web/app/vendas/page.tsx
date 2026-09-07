@@ -44,7 +44,7 @@ export default function VendasPage() {
     queryFn: currentCashRegister,
   });
   const branchesQuery = useQuery({ queryKey: ["branches"], queryFn: listBranches });
-  const devicesQuery = useQuery({ queryKey: ["devices"], queryFn: listDevices });
+  const devicesQuery = useQuery({ queryKey: ["devices"], queryFn: () => listDevices() });
   const productsQuery = useQuery({
     queryKey: ["products", "vendas"],
     queryFn: () => listProducts({ pageSize: 100, isActive: true }),
